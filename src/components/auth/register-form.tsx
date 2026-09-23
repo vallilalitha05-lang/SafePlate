@@ -48,22 +48,22 @@ export function RegisterForm() {
         <Label>I am registering as</Label>
         <div className="grid gap-3 sm:grid-cols-2">
           {roles.map(({ value, title, description, icon: Icon }) => (
-            <label key={value} className={cn("relative cursor-pointer rounded-lg border p-4 transition hover:border-emerald-400", role === value ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600" : "border-slate-200 bg-white")}>
+            <label key={value} className={cn("relative cursor-pointer rounded-lg border bg-card p-4 transition hover:border-primary/50", role === value ? "border-primary bg-accent ring-1 ring-primary" : "border-border")}>
               <input type="radio" name="role" value={value} checked={role === value} onChange={() => setRole(value)} className="sr-only" />
-              <Icon className="mb-3 h-5 w-5 text-emerald-700" aria-hidden="true" />
-              <p className="font-medium text-slate-900">{title}</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+              <Icon className="mb-3 h-5 w-5 text-primary" aria-hidden="true" />
+              <p className="font-medium text-foreground">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
             </label>
           ))}
         </div>
       </div>
       <div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" name="fullName" autoComplete="name" required minLength={2} placeholder="Jordan Lee" /></div>
       <div className="space-y-2"><Label htmlFor="email">Email address</Label><Input id="email" name="email" type="email" autoComplete="email" required placeholder="you@example.com" /></div>
-      <div className="space-y-2"><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} placeholder="At least 8 characters" /><p className="text-xs text-slate-500">Use at least 8 characters.</p></div>
-      {status && <p role="status" className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{status}</p>}
+      <div className="space-y-2"><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} placeholder="At least 8 characters" /><p className="text-xs text-muted-foreground">Use at least 8 characters.</p></div>
+      {status && <p role="status" className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{status}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>{isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}Create account</Button>
-      <p className="text-center text-xs text-slate-500">Your role determines the workspace and records you can access.</p>
-      <p className="text-center text-sm text-slate-500">Already registered? <Link className="font-medium text-emerald-700 hover:underline" href="/login">Sign in</Link></p>
+      <p className="text-center text-xs text-muted-foreground">Your role determines the workspace and records you can access.</p>
+      <p className="text-center text-sm text-muted-foreground">Already registered? <Link className="font-medium text-primary hover:underline" href="/login">Sign in</Link></p>
     </form>
   );
 }
