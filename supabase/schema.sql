@@ -71,6 +71,17 @@ create policy "Store owners can read their own stores"
 on public.stores for select to authenticated
 using ((select auth.uid()) = owner_id);
 
+-- Inspectors need a directory of stores to start an inspection. This does not
+-- give them write access to stores, and store owners still only see their own.
+create policy "Inspectors can view stores"
+on public.stores for select to authenticated
+using (
+  exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'inspector'
+  )
+);
+
 create policy "Store owners can link their own stores"
 on public.stores for insert to authenticated
 with check (
@@ -89,3 +100,47 @@ with check ((select auth.uid()) = owner_id);
 create policy "Store owners can delete their own stores"
 on public.stores for delete to authenticated
 using ((select auth.uid()) = owner_id);
+
+-- An inspection is an immutable checklist submitted by an inspector for one
+-- store. The JSON array keeps the individual checklist responses together
+-- while the status supports concise reporting in later stories.
+create table public.inspections (
+  id uuid primary key default gen_random_uuid(),
+  store_id uuid not null references public.stores(id) on delete restrict,
+  inspector_id uuid not null default auth.uid() references public.profiles(id) on delete restrict,
+  checklist jsonb not null default '[]'::jsonb check (jsonb_typeof(checklist) = 'array'),
+  overall_status text not null check (overall_status in ('pass', 'needs_attention')),
+  notes text check (char_length(notes) <= 1000),
+  created_at timestamptz not null default now()
+);
+
+create index inspections_store_id_idx on public.inspections(store_id);
+create index inspections_inspector_id_idx on public.inspections(inspector_id);
+
+alter table public.inspections enable row level security;
+revoke all on public.inspections from anon;
+grant select, insert on public.inspections to authenticated;
+
+create policy "Inspectors can read their own inspections"
+on public.inspections for select to authenticated
+using ((select auth.uid()) = inspector_id);
+
+create policy "Store owners can read inspections for their stores"
+on public.inspections for select to authenticated
+using (
+  exists (
+    select 1 from public.stores
+    where id = store_id and owner_id = (select auth.uid())
+  )
+);
+
+create policy "Inspectors can submit their own inspections"
+on public.inspections for insert to authenticated
+with check (
+  (select auth.uid()) = inspector_id
+  and exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'inspector'
+  )
+  and exists (select 1 from public.stores where id = store_id)
+);
