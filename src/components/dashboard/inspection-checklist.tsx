@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2, CircleAlert, ClipboardCheck, LoaderCircle, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,10 +27,7 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
   const [isPending, setIsPending] = useState(false);
   const selectedStore = stores.find((store) => store.id === selectedStoreId);
   const complete = checklistItems.every((item) => results[item]);
-  const overallStatus = useMemo<Result | undefined>(() => {
-    if (!complete) return undefined;
-    return checklistItems.some((item) => results[item] === "needs_attention") ? "needs_attention" : "pass";
-  }, [complete, results]);
+  const overallStatus: Result | undefined = !complete ? undefined : checklistItems.some((item) => results[item] === "needs_attention") ? "needs_attention" : "pass";
 
   async function submitInspection() {
     if (!selectedStoreId) {
