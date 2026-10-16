@@ -222,6 +222,45 @@ create trigger create_remediation_ticket_after_inspection
 after insert on public.inspections
 for each row execute function private.create_remediation_ticket();
 
+-- A notification is created with each remediation ticket so a store owner can
+-- immediately see that a new issue needs attention in their workspace.
+create table public.owner_notifications (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references public.profiles(id) on delete cascade,
+  ticket_id uuid not null unique references public.remediation_tickets(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create index owner_notifications_owner_created_idx
+on public.owner_notifications(owner_id, created_at desc);
+
+alter table public.owner_notifications enable row level security;
+revoke all on public.owner_notifications from anon;
+grant select on public.owner_notifications to authenticated;
+
+create policy "Store owners can read their ticket notifications"
+on public.owner_notifications for select to authenticated
+using ((select auth.uid()) = owner_id);
+
+create function private.create_ticket_notification()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.owner_notifications (owner_id, ticket_id)
+  values (new.owner_id, new.id);
+  return new;
+end;
+$$;
+
+revoke execute on function private.create_ticket_notification() from public, anon, authenticated;
+
+create trigger create_ticket_notification_after_ticket
+after insert on public.remediation_tickets
+for each row execute function private.create_ticket_notification();
+
 -- Photos are private evidence for failed checklist items. Files are stored
 -- outside the database and the first path segment must be the inspector's ID.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -250,5 +289,17 @@ using (
   and exists (
     select 1 from public.profiles
     where id = (select auth.uid()) and role = 'inspector'
+  )
+);
+
+create policy "Store owners can read ticket inspection photos"
+on storage.objects for select to authenticated
+using (
+  bucket_id = 'inspection-photos'
+  and exists (
+    select 1
+    from public.remediation_tickets
+    where owner_id = (select auth.uid())
+      and flagged_items @> jsonb_build_array(jsonb_build_object('photo_path', name))
   )
 );
