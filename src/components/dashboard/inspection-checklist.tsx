@@ -30,6 +30,7 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
   const [isPending, setIsPending] = useState(false);
   const selectedStore = stores.find((store) => store.id === selectedStoreId);
   const unmarkedItems = checklistItems.filter((item) => !responses[item]?.result);
+  const failedItemsMissingComments = checklistItems.filter((item) => responses[item]?.result === "fail" && !responses[item]?.comment.trim());
   const complete = unmarkedItems.length === 0;
   const overallStatus: Result | undefined = !complete ? undefined : checklistItems.some((item) => responses[item]?.result === "fail") ? "fail" : "pass";
 
@@ -65,6 +66,10 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
     }
     if (!complete || !overallStatus) {
       setStatus(`Mark every checklist item before submitting: ${unmarkedItems.join("; ")}.`);
+      return;
+    }
+    if (failedItemsMissingComments.length > 0) {
+      setStatus(`Add a written comment for every failed item before submitting: ${failedItemsMissingComments.join("; ")}.`);
       return;
     }
 
@@ -137,8 +142,8 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
             <Button type="button" size="sm" variant={responses[item]?.result === "fail" ? "destructive" : "outline"} onClick={() => setResult(item, "fail")}><CircleAlert className="h-4 w-4" />Fail</Button>
           </div>
           {responses[item]?.result === "fail" && <div className="space-y-3 border-t border-destructive/20 pt-3 pl-9">
-            <p className="text-sm text-destructive">Document this failed item with a comment and/or photo.</p>
-            <div className="space-y-2"><Label htmlFor={`comment-${index}`}>Comment <span className="text-muted-foreground">(optional)</span></Label><Input id={`comment-${index}`} value={responses[item]?.comment ?? ""} onChange={(event) => setComment(item, event.target.value)} maxLength={500} placeholder="Describe what needs attention" /></div>
+            <p className="text-sm text-destructive">A written comment is required for every failed item. Add a photo if useful.</p>
+            <div className="space-y-2"><Label htmlFor={`comment-${index}`}>Comment <span className="text-destructive">(required)</span></Label><Input id={`comment-${index}`} value={responses[item]?.comment ?? ""} onChange={(event) => setComment(item, event.target.value)} maxLength={500} required aria-required="true" placeholder="Describe what needs attention" /></div>
             <div className="space-y-2"><Label htmlFor={`photo-${index}`} className="flex items-center gap-2"><ImagePlus className="h-4 w-4" />Photo <span className="text-muted-foreground">(optional, JPEG, PNG, or WebP; max 5 MB)</span></Label><Input id={`photo-${index}`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setPhoto(item, event.target.files?.[0])} />{responses[item]?.photo && <p className="text-sm text-muted-foreground">Attached: {responses[item].photo?.name}</p>}</div>
           </div>}
         </div>)}
