@@ -145,6 +145,83 @@ with check (
   and exists (select 1 from public.stores where id = store_id)
 );
 
+-- A ticket is created automatically for an inspection with failed items. It is
+-- visible only to the associated store owner and the inspector who submitted it.
+create table public.remediation_tickets (
+  id uuid primary key default gen_random_uuid(),
+  inspection_id uuid not null unique references public.inspections(id) on delete cascade,
+  store_id uuid not null references public.stores(id) on delete restrict,
+  owner_id uuid not null references public.profiles(id) on delete restrict,
+  flagged_items jsonb not null check (jsonb_typeof(flagged_items) = 'array' and jsonb_array_length(flagged_items) > 0),
+  status text not null default 'open' check (status in ('open', 'resolved')),
+  created_at timestamptz not null default now()
+);
+
+create index remediation_tickets_owner_id_idx on public.remediation_tickets(owner_id);
+create index remediation_tickets_inspection_id_idx on public.remediation_tickets(inspection_id);
+
+alter table public.remediation_tickets enable row level security;
+revoke all on public.remediation_tickets from anon;
+grant select on public.remediation_tickets to authenticated;
+
+create policy "Store owners can read their remediation tickets"
+on public.remediation_tickets for select to authenticated
+using ((select auth.uid()) = owner_id);
+
+create policy "Inspectors can read tickets they submitted"
+on public.remediation_tickets for select to authenticated
+using (
+  exists (
+    select 1 from public.inspections
+    where id = inspection_id and inspector_id = (select auth.uid())
+  )
+);
+
+create schema if not exists private;
+
+create function private.create_remediation_ticket()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  failed_items jsonb;
+begin
+  if exists (
+    select 1
+    from jsonb_array_elements(new.checklist) as checklist_item
+    where checklist_item ->> 'result' = 'fail'
+      and (
+        coalesce(btrim(checklist_item ->> 'comment'), '') = ''
+        or coalesce(checklist_item ->> 'remediation_deadline', '') = ''
+        or checklist_item ->> 'remediation_deadline' < current_date::text
+      )
+  ) then
+    raise exception 'Every failed checklist item must include a comment and a remediation deadline that is today or later';
+  end if;
+
+  select jsonb_agg(checklist_item) into failed_items
+  from jsonb_array_elements(new.checklist) as checklist_item
+  where checklist_item ->> 'result' = 'fail';
+
+  if failed_items is not null then
+    insert into public.remediation_tickets (inspection_id, store_id, owner_id, flagged_items)
+    select new.id, new.store_id, stores.owner_id, failed_items
+    from public.stores as stores
+    where stores.id = new.store_id;
+  end if;
+
+  return new;
+end;
+$$;
+
+revoke execute on function private.create_remediation_ticket() from public, anon, authenticated;
+
+create trigger create_remediation_ticket_after_inspection
+after insert on public.inspections
+for each row execute function private.create_remediation_ticket();
+
 -- Photos are private evidence for failed checklist items. Files are stored
 -- outside the database and the first path segment must be the inspector's ID.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
