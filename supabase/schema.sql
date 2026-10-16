@@ -109,7 +109,7 @@ create table public.inspections (
   store_id uuid not null references public.stores(id) on delete restrict,
   inspector_id uuid not null default auth.uid() references public.profiles(id) on delete restrict,
   checklist jsonb not null default '[]'::jsonb check (jsonb_typeof(checklist) = 'array'),
-  overall_status text not null check (overall_status in ('pass', 'needs_attention')),
+  overall_status text not null check (overall_status in ('pass', 'fail')),
   notes text check (char_length(notes) <= 1000),
   created_at timestamptz not null default now()
 );
@@ -143,4 +143,35 @@ with check (
     where id = (select auth.uid()) and role = 'inspector'
   )
   and exists (select 1 from public.stores where id = store_id)
+);
+
+-- Photos are private evidence for failed checklist items. Files are stored
+-- outside the database and the first path segment must be the inspector's ID.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('inspection-photos', 'inspection-photos', false, 5242880, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+set public = excluded.public,
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
+
+create policy "Inspectors can upload their own inspection photos"
+on storage.objects for insert to authenticated
+with check (
+  bucket_id = 'inspection-photos'
+  and (storage.foldername(name))[1] = (select auth.uid()::text)
+  and exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'inspector'
+  )
+);
+
+create policy "Inspectors can read their own inspection photos"
+on storage.objects for select to authenticated
+using (
+  bucket_id = 'inspection-photos'
+  and owner_id = (select auth.uid()::text)
+  and exists (
+    select 1 from public.profiles
+    where id = (select auth.uid()) and role = 'inspector'
+  )
 );
