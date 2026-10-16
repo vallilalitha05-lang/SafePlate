@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import { BellRing, Building2, ClipboardCheck, ImageIcon, LogOut, MapPin, Store, TicketCheck, UserRoundCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ async function signOut() {
   "use server";
   const supabase = await createClient();
   await supabase.auth.signOut();
+  redirect("/");
 }
 
 type LinkedStore = { id: string; name: string; address: string | null };

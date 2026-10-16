@@ -63,7 +63,7 @@ export function RegisterForm() {
       {status && <p role="status" className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{status}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>{isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}Create account</Button>
       <p className="text-center text-xs text-muted-foreground">Your role determines the workspace and records you can access.</p>
-      <p className="text-center text-sm text-muted-foreground">Already registered? <Link className="font-medium text-primary hover:underline" href="/login">Sign in</Link></p>
+      <p className="text-center text-sm text-muted-foreground">Already registered? <Link className="font-medium text-primary hover:underline" href="/">Sign in</Link></p>
     </form>
   );
 }
