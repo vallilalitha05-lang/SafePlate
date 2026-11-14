@@ -16,6 +16,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Store ownership and selection | `src/components/dashboard/store-link-form.tsx`, `src/app/inspector/page.tsx` |
 | Checklist and evidence | `src/components/dashboard/inspection-checklist.tsx`, `supabase/schema.sql` |
 | Tickets and notifications | `src/app/owner/page.tsx`, `src/components/dashboard/workspace.tsx`, `supabase/schema.sql` |
+| Ticket evidence submission | `src/app/owner/tickets/[ticketId]/page.tsx`, `src/components/dashboard/evidence-upload-form.tsx`, `supabase/migrations/20261114000000_ticket_evidence.sql` |
 
 ## Account and access
 
@@ -129,6 +130,22 @@ referenced photo.
 | --- | --- | --- |
 | MAN-11.1 | Sign in as the linked owner for the ticket created in MAN-7.1. | Every failed item shows its comment and deadline; the evidence item has a working photo link. |
 | MAN-11.2 | Sign in as a different owner and attempt to access the first owner’s ticket/evidence through normal app navigation. | The other owner cannot view the ticket or photo. |
+
+### Story 12: Upload evidence that a flagged issue is fixed
+
+**Production code:** The owner opens a ticket at `/owner/tickets/[ticketId]` and
+uploads a photo per flagged item to the private `remediation-evidence` bucket
+(path `<owner id>/<ticket id>/<file>`). `submit_ticket_evidence` checks ticket
+ownership, attaches the evidence to the flagged item, sets its status to
+`pending_inspector_review` and sets `resolved_late` when the deadline has passed.
+Storage RLS only lets the ticket's owner upload, and lets the issuing inspector read.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC12.1 Evidence before deadline | The photo is uploaded, then `submit_ticket_evidence` stores `evidence_photo_path` on the item and sets `status: "pending_inspector_review"`. | **MAN-12.1:** As Owner A, open a ticket with a future deadline via **Upload evidence of fixes**, choose a JPG/PNG/WebP photo for one item, and select **Submit for inspector review**. | The item shows **Pending inspector review** and **View submitted evidence** opens the photo. No email is needed. |
+| AC12.2 Evidence after deadline | The function still accepts the submission and sets `resolved_late: true` when today is after the item's deadline. | **MAN-12.2:** In the Supabase SQL editor, move one flagged item's `remediation_deadline` on Owner A's open ticket to a past date. As Owner A, submit evidence for that item. | The submission is accepted; the item shows **Pending inspector review** and **Resolved late**. A warning shows before submission. |
+| AC12.3 Non-owner submission | RLS hides the ticket from other owners; the page shows an authorization error. Storage RLS and the function (`42501`) reject uploads and submissions from non-owners. | **MAN-12.3:** Copy the URL of Owner A's ticket page. Sign in as Owner B (Store B) and open that URL. Optionally, in the browser console, call `submit_ticket_evidence` with Owner A's ticket ID. | Owner B sees **Not authorized** with “You are not authorized to submit evidence for this ticket.” The RPC call is rejected and nothing changes on Owner A's ticket. |
+| Unsupported file type | The form accepts only JPEG, PNG and WebP up to 5 MB; the bucket enforces the same limits. | **MAN-12.4:** Choose a PDF or TXT file as evidence. | The file is rejected and the accepted formats are stated. |
 
 ## Baseline release checks
 

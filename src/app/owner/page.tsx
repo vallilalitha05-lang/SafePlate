@@ -1,19 +1,14 @@
 import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { Workspace } from "@/components/dashboard/workspace";
+import type { FlaggedItem } from "@/lib/evidence";
 import { createClient } from "@/lib/supabase/server";
 
-type TicketItem = {
-  item: string;
-  comment: string | null;
-  remediation_deadline: string | null;
-  photo_path: string | null;
-};
 
 type TicketRow = {
   id: string;
   status: string;
-  flagged_items: TicketItem[];
+  flagged_items: FlaggedItem[];
   created_at: string;
   stores: { name: string }[] | null;
 };

@@ -5,6 +5,7 @@ Implements the Project 1 **Account & Access** story: people register as either a
 ## Local setup
 
 1. Create a Supabase project and run [`supabase/schema.sql`](supabase/schema.sql) in its SQL editor.
+   For an existing project, run only the new files in [`supabase/migrations/`](supabase/migrations) (for example, `20261114000000_ticket_evidence.sql` for ticket evidence).
 2. Copy `.env.example` to `.env.local`, then add the project URL and **publishable** key from Supabase Connect.
 3. Run `pnpm install` and `pnpm dev`.
 
