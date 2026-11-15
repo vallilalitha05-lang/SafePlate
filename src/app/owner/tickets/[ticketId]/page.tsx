@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Clock, ImageIcon, ShieldAlert, TicketCheck } from "lucide-react";
+import { ArrowLeft, ImageIcon, ShieldAlert, TicketCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EvidenceUploadForm } from "@/components/dashboard/evidence-upload-form";
+import { OverdueNotice } from "@/components/dashboard/overdue-notice";
 import { getViewer } from "@/lib/auth";
-import { authorizationError, isPastDeadline, type FlaggedItem } from "@/lib/evidence";
+import { authorizationError, type FlaggedItem } from "@/lib/evidence";
+import { needsAction, sortByDeadline } from "@/lib/deadlines";
+import { DeadlineBadge } from "@/components/dashboard/deadline-badge";
 import { createClient } from "@/lib/supabase/server";
 
 type TicketRow = {
@@ -67,20 +70,19 @@ export default async function OwnerTicketPage({ params }: { params: Promise<{ ti
     <Card className="mt-6">
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2"><CardTitle className="flex items-center gap-2"><TicketCheck className="h-5 w-5 text-primary" />{storeName(ticket.stores)}</CardTitle><Badge>{ticket.status}</Badge></div>
-        <CardDescription>Issued {new Date(ticket.created_at).toLocaleDateString()}. Upload a photo showing each flagged issue has been fixed and submit it for inspector review.</CardDescription>
+        <CardDescription>Issued {new Date(ticket.created_at).toLocaleDateString()}. Issues are listed by remediation deadline, soonest first. Upload a photo showing each flagged issue has been fixed and submit it for inspector review.</CardDescription>
       </CardHeader>
       <CardContent>
-        <ul className="space-y-4">{ticket.flagged_items.map((item, index) => {
+        <ul className="space-y-4">{sortByDeadline(ticket.flagged_items).map((item, index) => {
           const pendingReview = item.status === "pending_inspector_review";
-          const overdue = !pendingReview && isPastDeadline(item.remediation_deadline);
           const inspectionPhoto = item.photo_path ? photoUrls[`inspection-photos/${item.photo_path}`] : undefined;
           const evidencePhoto = item.evidence_photo_path ? photoUrls[`remediation-evidence/${item.evidence_photo_path}`] : undefined;
           return <li key={item.item} className="rounded-lg border bg-background p-4">
             <div className="flex flex-wrap items-start justify-between gap-2"><p className="font-medium">{item.item}</p><div className="flex flex-wrap gap-2">{pendingReview ? <Badge>Pending inspector review</Badge> : <Badge variant="outline">Awaiting evidence</Badge>}{item.resolved_late && <Badge variant="destructive">Resolved late</Badge>}</div></div>
             {item.comment && <p className="mt-1 text-sm text-muted-foreground">{item.comment}</p>}
-            <p className="mt-2 flex items-center gap-2 text-sm"><Clock className="h-4 w-4" /><span className="font-medium">Fix by:</span> {item.remediation_deadline}</p>
+            <DeadlineBadge className="mt-2" deadline={item.remediation_deadline} submitted={!needsAction(item)} />
             {inspectionPhoto && <a className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline" href={inspectionPhoto} target="_blank" rel="noreferrer"><ImageIcon className="h-4 w-4" />View inspection photo</a>}
-            {overdue && isOpen && <p className="mt-3 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-800"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />The deadline has passed. You can still submit evidence; the inspector will see it marked as resolved late.</p>}
+            {isOpen && !pendingReview && <OverdueNotice deadline={item.remediation_deadline} />}
             {pendingReview && <div className="mt-3 rounded-md bg-muted/60 p-3 text-sm">
               <p><span className="font-medium">Evidence submitted</span>{item.evidence_submitted_at ? ` ${new Date(item.evidence_submitted_at).toLocaleString()}` : ""}</p>
               {item.evidence_note && <p className="mt-1 text-muted-foreground">{item.evidence_note}</p>}

@@ -14,8 +14,3 @@ export type FlaggedItem = {
   resolved_late?: boolean;
 };
 
-export function isPastDeadline(deadline: string | null, today = new Date()) {
-  if (!deadline) return false;
-  const local = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-  return deadline < local;
-}
