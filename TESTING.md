@@ -17,6 +17,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Checklist and evidence | `src/components/dashboard/inspection-checklist.tsx`, `supabase/schema.sql` |
 | Tickets and notifications | `src/app/owner/page.tsx`, `src/components/dashboard/workspace.tsx`, `supabase/schema.sql` |
 | Ticket evidence submission | `src/app/owner/tickets/[ticketId]/page.tsx`, `src/components/dashboard/evidence-upload-form.tsx`, `supabase/migrations/20261114000000_ticket_evidence.sql` |
+| Remediation deadlines and priorities | `src/lib/deadlines.ts`, `src/components/dashboard/deadline-badge.tsx`, `src/components/dashboard/workspace.tsx`, `src/app/owner/tickets/[ticketId]/page.tsx` |
 
 ## Account and access
 
@@ -146,6 +147,24 @@ Storage RLS only lets the ticket's owner upload, and lets the issuing inspector 
 | AC12.2 Evidence after deadline | The function still accepts the submission and sets `resolved_late: true` when today is after the item's deadline. | **MAN-12.2:** In the Supabase SQL editor, move one flagged item's `remediation_deadline` on Owner A's open ticket to a past date. As Owner A, submit evidence for that item. | The submission is accepted; the item shows **Pending inspector review** and **Resolved late**. A warning shows before submission. |
 | AC12.3 Non-owner submission | RLS hides the ticket from other owners; the page shows an authorization error. Storage RLS and the function (`42501`) reject uploads and submissions from non-owners. | **MAN-12.3:** Copy the URL of Owner A's ticket page. Sign in as Owner B (Store B) and open that URL. Optionally, in the browser console, call `submit_ticket_evidence` with Owner A's ticket ID. | Owner B sees **Not authorized** with “You are not authorized to submit evidence for this ticket.” The RPC call is rejected and nothing changes on Owner A's ticket. |
 | Unsupported file type | The form accepts only JPEG, PNG and WebP up to 5 MB; the bucket enforces the same limits. | **MAN-12.4:** Choose a PDF or TXT file as evidence. | The file is rejected and the accepted formats are stated. |
+
+### Story 13: See the remediation deadline for each issue
+
+**Production code:** `DeadlineBadge` shows each flagged item's deadline as a
+readable date with a countdown worked out from the owner's own local date, so
+“Due today” is right in the owner's timezone. `sortByDeadline` orders items
+needing action by earliest deadline; items with submitted evidence come last.
+The **Fix priorities** card lists every outstanding item across open tickets.
+
+No formal acceptance criteria were supplied with this story; these were derived from it.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC13.1 Deadline on every issue | Each flagged item on the dashboard and ticket page shows **Fix by:** with the formatted date and a countdown. | **MAN-13.1:** As Owner A, open the workspace and a ticket page for a ticket with two failed items. | Every item shows its deadline (e.g. “Fix by: Fri, Nov 20, 2026 · Due in 5 days”). |
+| AC13.2 Prioritized by deadline | **Fix priorities** lists outstanding items from all open tickets, earliest deadline first. Ticket items are sorted the same way. | **MAN-13.2:** Create two tickets for Owner A whose items have different deadlines (e.g. +7 days and +1 day). Open the workspace. | The +1 day item appears first in **Fix priorities** and first within its ticket. |
+| AC13.3 Urgency is clear | Overdue and due-today items are red, items due within 3 days are amber, later items are neutral. | **MAN-13.3:** In the Supabase SQL editor, set one item's deadline to today, one to tomorrow and one to a past date. Reload the workspace. | Labels read “Due today” (red), “Due tomorrow” (amber) and “Overdue by N days” (red). The overdue item is listed first. |
+| AC13.4 Submitted items drop off the list | Items with evidence submitted leave **Fix priorities** and show “Evidence submitted” instead of a countdown. | **MAN-13.4:** Submit evidence for one item (MAN-12.1) and return to the workspace. | That item is no longer in **Fix priorities**; on its ticket it shows “Evidence submitted” and is listed after outstanding items. |
+| Data isolation | Deadlines come from the owner-scoped ticket query (RLS). | **MAN-13.5:** Sign in as Owner B. | Owner B sees none of Owner A's deadlines or priorities. |
 
 ## Baseline release checks
 
