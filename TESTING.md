@@ -24,6 +24,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Daily deadline check and overdue flags | `supabase/migrations/20261119000000_daily_deadline_check.sql`, `src/components/dashboard/overdue-issues.tsx`, `src/components/dashboard/inspector-notifications.tsx`, `src/app/inspector/page.tsx` |
 | Store suspension | `supabase/migrations/20261120000000_store_suspensions.sql`, `src/components/dashboard/suspend-store-form.tsx`, `src/components/dashboard/store-operating-status.tsx`, `src/components/dashboard/suspension-banner.tsx`, `src/components/dashboard/overdue-issues.tsx` |
 | Deadline warnings | `supabase/migrations/20261121000000_deadline_warnings.sql`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts` |
+| Inspector store history | `supabase/migrations/20261122000000_store_inspection_history.sql`, `src/app/inspector/stores/[storeId]/page.tsx`, `src/components/dashboard/store-history.tsx`, `src/components/dashboard/store-directory.tsx`, `src/lib/history.ts` |
 
 ## Account and access
 
@@ -290,6 +291,22 @@ No formal acceptance criteria were supplied with this story; these were derived 
 | AC19.3 Warned once per deadline | Re-running does not duplicate; an extended deadline is warned about again when it comes within 3 days. | **MAN-19.3:** Run the check twice. Then, as the inspector, **Request new evidence…** with a new deadline 2 days out and run the check. | The second run returns `{"warnings": 0}`. The extended deadline produces one new warning. |
 | AC19.4 Only the store owner is warned | Warnings are `owner_notifications` for the ticket's owner (RLS). | **MAN-19.4:** Sign in as another store owner and as an inspector. | Neither sees the warning. |
 | AC19.5 Items further out are not warned yet | Deadlines more than 3 days away are skipped until they come within range. | **MAN-19.5:** Set a deadline 5 days out and run the check. | No warning until the check runs 3 days before the deadline. |
+
+### Story 20: Inspector retrieves the full inspection history for any store
+
+**Production code:** `get_store_inspection_history(store_id)` (inspectors only)
+returns the store, every inspection of it newest first — whichever inspector
+carried it out, with that inspector's name, the checklist and its remediation
+ticket — and the store's suspension record. Inspectors open it from **Store
+history** in their workspace (`/inspector/stores/[storeId]`), which shows pass
+rate, repeat violations, violation trends, every inspection and suspensions.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC20.1 Inspector retrieves history for any store | For a signed-in inspector and a valid store ID, the function returns the full list of past inspections for that store, including those by other inspectors. | **MAN-20.1:** Have two inspectors each submit an inspection for Store A. Sign in as one of them, open **Store history** and select Store A. | **All inspections** lists both inspections newest first with date, inspector, result, failed items, comments, deadlines and remediation status; totals and pass rate match. |
+| History for a store you never inspected | Same function; not limited to the caller's own inspections. | **MAN-20.2:** Open a store inspected only by another inspector. | Its inspections are listed. |
+| Invalid or unknown store ID | The page shows **Store not found**. | **MAN-20.3:** Open `/inspector/stores/not-a-store` and `/inspector/stores/00000000-0000-0000-0000-000000000000`. | **Store not found** in both cases. |
+| Non-inspectors cannot use it | The function refuses non-inspectors (`42501`); `/inspector/...` redirects owners. | **MAN-20.4:** As a store owner, call `get_store_inspection_history` from the console. | Refused. (Story 21 lets owners read their own stores only.) |
 
 ## Baseline release checks
 
