@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth";
 import { Workspace } from "@/components/dashboard/workspace";
 import type { FlaggedItem } from "@/lib/evidence";
+import { storeNameOf, type StoreRelation } from "@/lib/stores";
+import type { NotificationView, OwnerNotification } from "@/lib/notifications";
 import { createClient } from "@/lib/supabase/server";
 
 
@@ -10,13 +12,7 @@ type TicketRow = {
   status: string;
   flagged_items: FlaggedItem[];
   created_at: string;
-  stores: { name: string }[] | null;
-};
-
-type TicketNotification = {
-  id: string;
-  ticket_id: string;
-  created_at: string;
+  stores: StoreRelation;
 };
 
 export default async function OwnerPage() {
@@ -27,7 +23,7 @@ export default async function OwnerPage() {
   const [{ data: stores }, { data: tickets }, { data: notifications }] = await Promise.all([
     supabase.from("stores").select("id, name, address").order("created_at", { ascending: true }),
     supabase.from("remediation_tickets").select("id, status, flagged_items, created_at, stores(name)").order("created_at", { ascending: false }),
-    supabase.from("owner_notifications").select("id, ticket_id, created_at").order("created_at", { ascending: false }),
+    supabase.from("owner_notifications").select("id, ticket_id, kind, item, created_at").is("read_at", null).order("created_at", { ascending: false }),
   ]);
   const ownerTickets = (tickets ?? []) as unknown as TicketRow[];
   const photoPaths = ownerTickets.flatMap((ticket) =>
@@ -40,5 +36,11 @@ export default async function OwnerPage() {
     (signedPhotos ?? []).flatMap((photo) => photo.signedUrl ? [[photo.path, photo.signedUrl]] : []),
   );
 
-  return <Workspace role={viewer.role} name={viewer.full_name} stores={stores ?? []} tickets={ownerTickets} notifications={(notifications ?? []) as TicketNotification[]} photoUrls={photoUrls} />;
+  const ticketsById = new Map(ownerTickets.map((ticket) => [ticket.id, ticket]));
+  const notificationViews: NotificationView[] = ((notifications ?? []) as OwnerNotification[]).map((notification) => {
+    const ticket = ticketsById.get(notification.ticket_id);
+    return { ...notification, store: storeNameOf(ticket?.stores, "your store"), ticketResolved: ticket?.status === "resolved" };
+  });
+
+  return <Workspace role={viewer.role} name={viewer.full_name} stores={stores ?? []} tickets={ownerTickets} notifications={notificationViews} photoUrls={photoUrls} />;
 }

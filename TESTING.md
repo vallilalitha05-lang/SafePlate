@@ -19,6 +19,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Ticket evidence submission | `src/app/owner/tickets/[ticketId]/page.tsx`, `src/components/dashboard/evidence-upload-form.tsx`, `supabase/migrations/20261114000000_ticket_evidence.sql` |
 | Remediation deadlines and priorities | `src/lib/deadlines.ts`, `src/components/dashboard/deadline-badge.tsx`, `src/components/dashboard/workspace.tsx`, `src/app/owner/tickets/[ticketId]/page.tsx` |
 | Evidence review | `src/app/inspector/page.tsx`, `src/components/dashboard/evidence-review-queue.tsx`, `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261116000000_review_ticket_evidence.sql` |
+| Fix approval and owner notifications | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts`, `src/app/owner/page.tsx`, `supabase/migrations/20261117000000_approval_notifications.sql` |
 
 ## Account and access
 
@@ -173,7 +174,7 @@ No formal acceptance criteria were supplied with this story; these were derived 
 flagged item on the inspector's own open tickets with status
 `pending_inspector_review`, oldest submission first, with the inspection photo
 beside the owner's evidence. `review_ticket_evidence` only lets the inspector who
-raised the ticket decide. **Mark resolved** sets the item to `resolved`; the ticket
+raised the ticket decide. **Approve fix** sets the item to `resolved`; the ticket
 becomes `resolved` once every item is. **Not resolved** requires feedback, can set
 a new deadline (today or later) and returns the item to the owner (`open`,
 `review_decision: "not_resolved"`). Owners cannot resubmit a resolved item.
@@ -183,10 +184,24 @@ No formal acceptance criteria were supplied with this story; these were derived 
 | Acceptance criterion | Production behavior | Test case | Expected result |
 | --- | --- | --- | --- |
 | AC14.1 Inspector sees submitted evidence | The queue lists pending evidence from the inspector's own tickets with both photos, the owner's note, submission time and late status. | **MAN-14.1:** As Owner A, submit evidence (MAN-12.1). Sign in as the inspector who raised the ticket. | **Evidence to review** shows the item, store, finding, inspection photo, evidence photo and note. |
-| AC14.2 Mark resolved | The item becomes **Resolved**; when it is the last open item the ticket becomes `resolved`. | **MAN-14.2:** Select **Mark resolved** (optionally with a comment). Sign in as Owner A. | The item leaves the queue. Owner A sees **Resolved** with the inspector's confirmation, the item leaves **Fix priorities** and no upload form is shown. With all items resolved the ticket shows `resolved`. |
+| AC14.2 Mark resolved | The item becomes **Resolved**; when it is the last open item the ticket becomes `resolved`. | **MAN-14.2:** Select **Approve fix** (optionally with a comment). Sign in as Owner A. | The item leaves the queue. Owner A sees **Resolved** with the inspector's confirmation, the item leaves **Fix priorities** and no upload form is shown. With all items resolved the ticket shows `resolved`. |
 | AC14.3 Not resolved | Feedback is required; the item returns to the owner with the feedback and optional new deadline. | **MAN-14.3:** Select **Not resolved** with no feedback, then with feedback and a new deadline. Sign in as Owner A. | Without feedback an error asks for it. With feedback, Owner A sees **Not resolved – resubmit**, the feedback and the new deadline; the item is back in **Fix priorities** and can be resubmitted. |
 | AC14.4 Only the issuing inspector can decide | The function rejects any other user with `42501`; RLS hides other inspectors' tickets. | **MAN-14.4:** Sign in as a different inspector; then, as Owner A, call `review_ticket_evidence` from the browser console. | The other inspector's queue does not include the item. The console call is rejected with “You are not authorized to review evidence for this ticket.” |
 | AC14.5 Resolved items stay resolved | `submit_ticket_evidence` rejects evidence for a resolved item; a resolved ticket accepts no new reviews or evidence. | **MAN-14.5:** As Owner A, call `submit_ticket_evidence` for a resolved item from the console. | Rejected with “The inspector has already marked this item as resolved.” |
+
+### Story 15: Approve a submitted fix
+
+**Production code:** **Approve fix** calls `review_ticket_evidence` with
+`resolved`. In the same transaction the item's status becomes `resolved` and an
+`item_approved` row is added to `owner_notifications` for the ticket's owner.
+The owner workspace lists unread notifications with **Mark as read** /
+**Mark all as read** (`mark_owner_notifications_read`).
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC15.1 Approval of valid evidence | The item's status changes to `resolved` and the store owner receives an `item_approved` notification naming the item and store. | **MAN-15.1:** As Owner A, submit evidence (MAN-12.1). As the issuing inspector, open **Evidence to review** and select **Approve fix**. Sign in as Owner A. | The inspector sees “Approved. The issue is resolved and the store owner has been notified.” Owner A's **Notifications** shows **Fix approved** for that item and store, and the item shows **Resolved**. |
+| Not resolved does not notify approval | Only an approval creates an `item_approved` notification. | **MAN-15.2:** As the inspector, mark another item **Not resolved** with feedback. Sign in as Owner A. | No **Fix approved** notification for that item; the feedback shows on the item instead. |
+| Notifications are private and can be cleared | RLS limits notifications to their owner; only the owner can mark them read. | **MAN-15.3:** As Owner A select **Mark as read**, then reload. Sign in as Owner B. | The notification no longer shows for Owner A. Owner B never sees Owner A's notifications. |
 
 ## Baseline release checks
 
