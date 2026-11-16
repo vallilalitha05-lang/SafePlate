@@ -9,6 +9,7 @@ export function ItemStatusBadges({ item }: { item: FlaggedItem }) {
     {item.status === "resolved" ? <Badge variant="success">Resolved</Badge>
       : item.status === "pending_inspector_review" ? <Badge>Pending inspector review</Badge>
       : item.status === "re_inspection_required" ? <Badge variant="warning">Re-inspection required</Badge>
+      : item.status === "overdue" ? <Badge variant="destructive">Overdue</Badge>
       : wasSentBack(item) ? <Badge variant="destructive">Not resolved – resubmit</Badge>
       : <Badge variant="outline">Awaiting evidence</Badge>}
     {item.resolved_late && <Badge variant="destructive">Resolved late</Badge>}
