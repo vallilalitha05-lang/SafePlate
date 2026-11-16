@@ -25,6 +25,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Store suspension | `supabase/migrations/20261120000000_store_suspensions.sql`, `src/components/dashboard/suspend-store-form.tsx`, `src/components/dashboard/store-operating-status.tsx`, `src/components/dashboard/suspension-banner.tsx`, `src/components/dashboard/overdue-issues.tsx` |
 | Deadline warnings | `supabase/migrations/20261121000000_deadline_warnings.sql`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts` |
 | Inspector store history | `supabase/migrations/20261122000000_store_inspection_history.sql`, `src/app/inspector/stores/[storeId]/page.tsx`, `src/components/dashboard/store-history.tsx`, `src/components/dashboard/store-directory.tsx`, `src/lib/history.ts` |
+| Owner store history | `supabase/migrations/20261123000000_owner_store_history.sql`, `src/app/owner/stores/[storeId]/page.tsx`, `src/components/dashboard/workspace.tsx` |
 
 ## Account and access
 
@@ -306,7 +307,23 @@ rate, repeat violations, violation trends, every inspection and suspensions.
 | AC20.1 Inspector retrieves history for any store | For a signed-in inspector and a valid store ID, the function returns the full list of past inspections for that store, including those by other inspectors. | **MAN-20.1:** Have two inspectors each submit an inspection for Store A. Sign in as one of them, open **Store history** and select Store A. | **All inspections** lists both inspections newest first with date, inspector, result, failed items, comments, deadlines and remediation status; totals and pass rate match. |
 | History for a store you never inspected | Same function; not limited to the caller's own inspections. | **MAN-20.2:** Open a store inspected only by another inspector. | Its inspections are listed. |
 | Invalid or unknown store ID | The page shows **Store not found**. | **MAN-20.3:** Open `/inspector/stores/not-a-store` and `/inspector/stores/00000000-0000-0000-0000-000000000000`. | **Store not found** in both cases. |
-| Non-inspectors cannot use it | The function refuses non-inspectors (`42501`); `/inspector/...` redirects owners. | **MAN-20.4:** As a store owner, call `get_store_inspection_history` from the console. | Refused. (Story 21 lets owners read their own stores only.) |
+| Non-inspectors cannot use it | The function refuses non-inspectors (`42501`); `/inspector/...` redirects owners. | **MAN-20.4:** As a store owner, call `get_store_inspection_history` from the console. | Refused for stores they do not own (see story 21). |
+
+### Story 21: Store owner retrieves the inspection history for their own store only
+
+**Production code:** `get_store_inspection_history(store_id)` (story 20) now
+also serves store owners, for stores they own. For any other store ID — another
+owner's store or one that does not exist — it raises the same `42501`
+authorization error, so owners cannot discover other stores. Owners open it
+from **Inspection history** on each linked store (`/owner/stores/[storeId]`),
+which shows the same trends, inspections and suspension record as story 20.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC21.1 Owner retrieves their own store's history | For an owner of Store A, the function returns the full list of Store A's inspections (all inspectors). | **MAN-21.1:** Sign in as Owner A and select **Inspection history** under Store A. | All of Store A's inspections, newest first, with results, failed items, remediation status, trends and the suspension record. |
+| AC21.2 Owner requests another store's history | The function refuses with `42501`; the page shows **Not authorized** and the authorization error. | **MAN-21.2:** As Owner B, open Store B's history and copy its URL. Sign in as Owner A and open that URL. | **Not authorized** – “You are not authorized to view this store's inspection history.” No Store B data is shown. |
+| Unknown or invalid store ID | Same authorization error for owners (no probing). | **MAN-21.3:** As Owner A open `/owner/stores/00000000-0000-0000-0000-000000000000`. | **Not authorized**, identical to MAN-21.2. |
+| Inspector access unchanged | Inspectors still get any store (story 20). | **MAN-21.4:** Repeat MAN-20.1. | Unchanged. |
 
 ## Baseline release checks
 
