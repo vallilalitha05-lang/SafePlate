@@ -18,6 +18,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Tickets and notifications | `src/app/owner/page.tsx`, `src/components/dashboard/workspace.tsx`, `supabase/schema.sql` |
 | Ticket evidence submission | `src/app/owner/tickets/[ticketId]/page.tsx`, `src/components/dashboard/evidence-upload-form.tsx`, `supabase/migrations/20261114000000_ticket_evidence.sql` |
 | Remediation deadlines and priorities | `src/lib/deadlines.ts`, `src/components/dashboard/deadline-badge.tsx`, `src/components/dashboard/workspace.tsx`, `src/app/owner/tickets/[ticketId]/page.tsx` |
+| Evidence review | `src/app/inspector/page.tsx`, `src/components/dashboard/evidence-review-queue.tsx`, `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261116000000_review_ticket_evidence.sql` |
 
 ## Account and access
 
@@ -165,6 +166,27 @@ No formal acceptance criteria were supplied with this story; these were derived 
 | AC13.3 Urgency is clear | Overdue and due-today items are red, items due within 3 days are amber, later items are neutral. | **MAN-13.3:** In the Supabase SQL editor, set one item's deadline to today, one to tomorrow and one to a past date. Reload the workspace. | Labels read “Due today” (red), “Due tomorrow” (amber) and “Overdue by N days” (red). The overdue item is listed first. |
 | AC13.4 Submitted items drop off the list | Items with evidence submitted leave **Fix priorities** and show “Evidence submitted” instead of a countdown. | **MAN-13.4:** Submit evidence for one item (MAN-12.1) and return to the workspace. | That item is no longer in **Fix priorities**; on its ticket it shows “Evidence submitted” and is listed after outstanding items. |
 | Data isolation | Deadlines come from the owner-scoped ticket query (RLS). | **MAN-13.5:** Sign in as Owner B. | Owner B sees none of Owner A's deadlines or priorities. |
+
+### Story 14: Review evidence submitted by a store owner
+
+**Production code:** The inspector workspace shows **Evidence to review**: every
+flagged item on the inspector's own open tickets with status
+`pending_inspector_review`, oldest submission first, with the inspection photo
+beside the owner's evidence. `review_ticket_evidence` only lets the inspector who
+raised the ticket decide. **Mark resolved** sets the item to `resolved`; the ticket
+becomes `resolved` once every item is. **Not resolved** requires feedback, can set
+a new deadline (today or later) and returns the item to the owner (`open`,
+`review_decision: "not_resolved"`). Owners cannot resubmit a resolved item.
+
+No formal acceptance criteria were supplied with this story; these were derived from it.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC14.1 Inspector sees submitted evidence | The queue lists pending evidence from the inspector's own tickets with both photos, the owner's note, submission time and late status. | **MAN-14.1:** As Owner A, submit evidence (MAN-12.1). Sign in as the inspector who raised the ticket. | **Evidence to review** shows the item, store, finding, inspection photo, evidence photo and note. |
+| AC14.2 Mark resolved | The item becomes **Resolved**; when it is the last open item the ticket becomes `resolved`. | **MAN-14.2:** Select **Mark resolved** (optionally with a comment). Sign in as Owner A. | The item leaves the queue. Owner A sees **Resolved** with the inspector's confirmation, the item leaves **Fix priorities** and no upload form is shown. With all items resolved the ticket shows `resolved`. |
+| AC14.3 Not resolved | Feedback is required; the item returns to the owner with the feedback and optional new deadline. | **MAN-14.3:** Select **Not resolved** with no feedback, then with feedback and a new deadline. Sign in as Owner A. | Without feedback an error asks for it. With feedback, Owner A sees **Not resolved – resubmit**, the feedback and the new deadline; the item is back in **Fix priorities** and can be resubmitted. |
+| AC14.4 Only the issuing inspector can decide | The function rejects any other user with `42501`; RLS hides other inspectors' tickets. | **MAN-14.4:** Sign in as a different inspector; then, as Owner A, call `review_ticket_evidence` from the browser console. | The other inspector's queue does not include the item. The console call is rejected with “You are not authorized to review evidence for this ticket.” |
+| AC14.5 Resolved items stay resolved | `submit_ticket_evidence` rejects evidence for a resolved item; a resolved ticket accepts no new reviews or evidence. | **MAN-14.5:** As Owner A, call `submit_ticket_evidence` for a resolved item from the console. | Rejected with “The inspector has already marked this item as resolved.” |
 
 ## Baseline release checks
 
