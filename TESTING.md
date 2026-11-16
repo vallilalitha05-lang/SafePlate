@@ -21,6 +21,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Evidence review | `src/app/inspector/page.tsx`, `src/components/dashboard/evidence-review-queue.tsx`, `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261116000000_review_ticket_evidence.sql` |
 | Fix approval and owner notifications | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts`, `src/app/owner/page.tsx`, `supabase/migrations/20261117000000_approval_notifications.sql` |
 | Fix rejection and follow-up inspections | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/follow-up-inspections.tsx`, `src/components/dashboard/verify-in-person-button.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261118000000_reject_and_reinspect.sql` |
+| Daily deadline check and overdue flags | `supabase/migrations/20261119000000_daily_deadline_check.sql`, `src/components/dashboard/overdue-issues.tsx`, `src/components/dashboard/inspector-notifications.tsx`, `src/app/inspector/page.tsx` |
 
 ## Account and access
 
@@ -224,6 +225,26 @@ remains for asking for a better photo without a visit.
 | Follow-up time must be in the future | The form and function refuse a missing or past time. | **MAN-16.3:** Enter a reason but no date (or a past time) and confirm. | “Choose a future date and time for the follow-up inspection.” Nothing changes. |
 | Verify in person | Approving from **Scheduled follow-up inspections** resolves the item and completes the follow-up. | **MAN-16.4:** After MAN-16.1, select **Verified in person – approve fix**. Sign in as Owner A. | The follow-up leaves the list; Owner A sees **Fix approved** and the item shows it was verified in person. |
 | Owner cannot bypass the visit | `submit_ticket_evidence` refuses evidence while the item is `re_inspection_required`. | **MAN-16.5:** As Owner A, call `submit_ticket_evidence` for that item from the console. | Rejected: a follow-up inspection is scheduled for this item. |
+
+### Story 17: Flag issues not resolved by their deadline
+
+**Production code:** `private.run_deadline_check()` runs daily at 06:05 UTC
+(00:05 US Central) through `pg_cron` (`safeplate-daily-deadline-check`). On each
+open ticket it flags items still waiting on the owner — no status yet, or sent
+back for new evidence — whose deadline is before today: `status` becomes
+`overdue` with `overdue_since`, and an `item_overdue` row is added to
+`inspector_notifications` for the inspector who raised the ticket. Items pending
+review, awaiting a follow-up visit, resolved or already overdue are untouched,
+so the check is safe to run more than once. Inspectors see **Notifications** and
+an **Overdue issues** list; owners see an **Overdue** badge and can still submit
+late evidence (AC12.2).
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC17.1 Deadline passes with no evidence | The daily check sets the item to `overdue` and notifies the assigned inspector. | **MAN-17.1:** In the Supabase SQL editor, set one flagged item's `remediation_deadline` on an open ticket to yesterday (no evidence submitted), then run `select private.run_deadline_check();`. Sign in as the inspector who raised the ticket, then as the owner. | The function returns 1. The inspector sees **Issue overdue** under **Notifications** and the item under **Overdue issues**; the owner sees an **Overdue** badge. |
+| AC17.2 Evidence submitted before the deadline | Items in `pending_inspector_review` are skipped. | **MAN-17.2:** Submit evidence for an item (MAN-12.1), then set its deadline to yesterday and run `select private.run_deadline_check();`. | The item is not flagged overdue, stays **Pending inspector review** and still appears in **Evidence to review**; no overdue notification is created. |
+| Runs daily and only once per item | The cron job exists; re-running does not duplicate flags or notifications. | **MAN-17.3:** Run `select jobname, schedule from cron.job;` then run the check twice. | `safeplate-daily-deadline-check` with `5 6 * * *`. The second run returns 0. |
+| Notifications are private | RLS limits `inspector_notifications` to the inspector it was sent to. | **MAN-17.4:** Sign in as a different inspector and as a store owner. | Neither sees the overdue notification. |
 
 ## Baseline release checks
 

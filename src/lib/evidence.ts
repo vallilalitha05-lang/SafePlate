@@ -2,7 +2,7 @@ export const authorizationError = "You are not authorized to submit evidence for
 
 export const reviewAuthorizationError = "You are not authorized to review evidence for this ticket.";
 
-export type FlaggedItemStatus = "open" | "pending_inspector_review" | "re_inspection_required" | "resolved";
+export type FlaggedItemStatus = "open" | "overdue" | "pending_inspector_review" | "re_inspection_required" | "resolved";
 export type ReviewDecision = "resolved" | "not_resolved" | "re_inspection";
 
 export type FlaggedItem = {
@@ -21,6 +21,8 @@ export type FlaggedItem = {
   follow_up_inspection_id?: string | null;
   follow_up_scheduled_for?: string | null;
   verified_in_person?: boolean;
+  /** Set by the daily deadline check when the deadline passed with no evidence. */
+  overdue_since?: string | null;
 };
 
 /** The inspector reviewed the last evidence and found the issue not yet fixed. */
