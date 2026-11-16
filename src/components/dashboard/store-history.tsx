@@ -18,7 +18,7 @@ export function StoreHistoryView({ history, viewer }: { history: StoreHistory; v
 
   return <div className="space-y-6">
     <div>
-      <p className="flex items-center gap-2 text-sm font-medium text-primary"><History className="h-4 w-4" />Inspection history</p>
+      <p className="flex items-center gap-2 text-sm font-medium text-primary"><History className="h-4 w-4" />{viewer === "store_owner" ? "Your compliance history" : "Inspection history"}</p>
       <h1 className="mt-1 flex flex-wrap items-center gap-3 text-3xl font-semibold tracking-tight">{store.name}{store.operating_status === "suspended" ? <Badge variant="destructive">Suspended</Badge> : <Badge variant="success">Active</Badge>}</h1>
       {store.address && <p className="mt-1 flex items-center gap-1 text-muted-foreground"><MapPin className="h-4 w-4" />{store.address}</p>}
     </div>
@@ -31,7 +31,7 @@ export function StoreHistoryView({ history, viewer }: { history: StoreHistory; v
     </div>
 
     <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" />Violation trends</CardTitle><CardDescription>Checklist items this store has failed, most frequent first.</CardDescription></CardHeader>
+      <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary" />Violation trends</CardTitle><CardDescription>{viewer === "store_owner" ? "Checklist items your store has failed, most frequent first. Repeat violations are the ones to watch." : "Checklist items this store has failed, most frequent first."}</CardDescription></CardHeader>
       <CardContent>
         {summary.violations.length === 0
           ? <p className="flex items-center gap-2 text-sm text-muted-foreground"><ShieldCheck className="h-4 w-4" />No violations recorded.</p>
