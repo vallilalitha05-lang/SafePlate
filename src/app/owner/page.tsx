@@ -24,7 +24,7 @@ export default async function OwnerPage() {
   const [{ data: stores }, { data: tickets }, { data: notifications }, { data: suspensionRows }] = await Promise.all([
     supabase.from("stores").select("id, name, address, operating_status").order("created_at", { ascending: true }),
     supabase.from("remediation_tickets").select("id, status, flagged_items, created_at, stores(name)").order("created_at", { ascending: false }),
-    supabase.from("owner_notifications").select("id, ticket_id, kind, item, created_at, follow_up_inspections(reason, scheduled_for), store_suspensions(reason, lift_reason, stores(name))").is("read_at", null).order("created_at", { ascending: false }),
+    supabase.from("owner_notifications").select("id, ticket_id, kind, item, deadline, created_at, follow_up_inspections(reason, scheduled_for), store_suspensions(reason, lift_reason, stores(name))").is("read_at", null).order("created_at", { ascending: false }),
     supabase.from("store_suspensions").select("id, store_id, reason, item, suspended_at, suspended_by, stores(name)").is("lifted_at", null).order("suspended_at", { ascending: false }),
   ]);
   const suspensions = ((suspensionRows ?? []) as unknown as SuspensionRow[]).map((row) => toActiveSuspension(row));

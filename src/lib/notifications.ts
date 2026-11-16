@@ -1,6 +1,6 @@
 import { storeNameOf, type StoreRelation } from "@/lib/stores";
 
-export type NotificationKind = "ticket_issued" | "item_approved" | "item_rejected" | "store_suspended" | "suspension_lifted";
+export type NotificationKind = "ticket_issued" | "item_approved" | "item_rejected" | "store_suspended" | "suspension_lifted" | "deadline_warning";
 
 type Suspension = { reason: string; lift_reason: string | null; stores: StoreRelation };
 
@@ -12,6 +12,8 @@ export type OwnerNotification = {
   kind: NotificationKind;
   item: string | null;
   created_at: string;
+  /** Deadline a warning is about (deadline_warning only). */
+  deadline?: string | null;
   /** Joined follow-up inspection for rejection notices; Supabase returns an object for a to-one join. */
   follow_up_inspections?: FollowUp | FollowUp[] | null;
   /** Joined suspension record for suspension notices. */
@@ -37,6 +39,14 @@ export function notificationStore(notification: OwnerNotification, ticketStore: 
 }
 
 export function describeNotification(notification: NotificationView) {
+  if (notification.kind === "deadline_warning") {
+    return {
+      title: "Deadline approaching",
+      message: `Fix “${notification.item}” at ${notification.store} and submit evidence before its remediation deadline. Issues not resolved by their deadline are flagged overdue and can lead to the store being suspended.`,
+      reason: undefined,
+      scheduledFor: undefined,
+    };
+  }
   if (notification.kind === "store_suspended") {
     return { title: "Store suspended", message: `An inspector suspended the operating status of ${notification.store}.`, reason: suspensionOf(notification)?.reason, scheduledFor: undefined };
   }
