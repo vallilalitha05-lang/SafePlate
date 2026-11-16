@@ -10,6 +10,7 @@ import type { FlaggedItem } from "@/lib/evidence";
 import { toInspectorNotification, type InspectorNotificationRow } from "@/lib/inspector-notifications";
 import { compareByDeadline } from "@/lib/deadlines";
 import { StoreOperatingStatus } from "@/components/dashboard/store-operating-status";
+import { StoreDirectory } from "@/components/dashboard/store-directory";
 import { toActiveSuspension, type SuspensionRow } from "@/lib/suspensions";
 import { storeNameOf, type StoreRelation } from "@/lib/stores";
 import { createClient } from "@/lib/supabase/server";
@@ -72,6 +73,7 @@ export default async function InspectorPage() {
     <section className="mt-8"><StoreOperatingStatus activeStores={activeStores} suspensions={suspensions} /></section>
     <section className="mt-8"><EvidenceReviewQueue entries={queue} photoUrls={photoUrls} /></section>
     <section className="mt-8"><FollowUpInspections followUps={followUps} /></section>
+    <section className="mt-8"><StoreDirectory stores={stores ?? []} /></section>
     <section className="mt-8"><InspectionChecklist stores={stores ?? []} /></section>
   </Workspace>;
 }
