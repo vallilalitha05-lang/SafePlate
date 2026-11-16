@@ -50,7 +50,7 @@ export function ReviewDecisionForm({ ticketId, item, index }: { ticketId: string
       setStatus({
         kind: "success",
         message: decision === "resolved"
-          ? ticketResolved ? "Marked resolved. Every issue on this ticket is now resolved, so the ticket is closed." : "Marked resolved. The store owner will see the decision on their ticket."
+          ? ticketResolved ? "Approved. The issue is resolved and the store owner has been notified. Every issue on this ticket is now resolved, so the ticket is closed." : "Approved. The issue is resolved and the store owner has been notified."
           : "Sent back to the store owner with your feedback.",
       });
       router.refresh();
@@ -73,7 +73,7 @@ export function ReviewDecisionForm({ ticketId, item, index }: { ticketId: string
     </div>
     {status && <p role={status.kind === "success" ? "status" : "alert"} aria-live="polite" className={`flex items-start gap-2 rounded-md border px-3 py-2 text-sm ${status.kind === "success" ? "border-primary/20 bg-primary/10 text-primary" : "border-destructive/20 bg-destructive/10 text-destructive"}`}>{status.kind === "unauthorized" && <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />}{status.message}</p>}
     <div className="flex flex-wrap gap-2">
-      <Button type="button" size="sm" onClick={() => decide("resolved")} disabled={busy}>{pending === "resolved" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Mark resolved</Button>
+      <Button type="button" size="sm" onClick={() => decide("resolved")} disabled={busy}>{pending === "resolved" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}Approve fix</Button>
       <Button type="button" size="sm" variant="outline" onClick={() => decide("not_resolved")} disabled={busy}>{pending === "not_resolved" ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}Not resolved</Button>
     </div>
   </div>;
