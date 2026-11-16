@@ -50,9 +50,16 @@ export function formatDeadline(deadline: string | null) {
   return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(day));
 }
 
-/** An item still needs the owner's action until evidence has been submitted. */
+/** An item needs the owner's action until evidence is submitted or the inspector resolves it. */
 export function needsAction(item: FlaggedItem) {
-  return item.status !== "pending_inspector_review";
+  return item.status !== "pending_inspector_review" && item.status !== "resolved";
+}
+
+/** Label shown instead of a countdown once the owner no longer needs to act. */
+export function settledLabel(item: FlaggedItem) {
+  if (item.status === "resolved") return "Resolved";
+  if (item.status === "pending_inspector_review") return "Evidence submitted";
+  return undefined;
 }
 
 /** Items needing action first, then by earliest deadline; items without a deadline last. */

@@ -24,7 +24,9 @@ export function useToday() {
   return useSyncExternalStore(subscribe, () => localToday(), () => null);
 }
 
-export function DeadlineBadge({ deadline, submitted = false, className }: { deadline: string | null; submitted?: boolean; className?: string }) {
+/** `settled` replaces the countdown once the owner no longer needs to act (e.g. "Resolved"). */
+export function DeadlineBadge({ deadline, settled, className }: { deadline: string | null; settled?: string; className?: string }) {
+  const submitted = Boolean(settled);
   const today = useToday();
   const days = today ? daysUntil(deadline, today) : null;
   const urgency = submitted ? "none" : deadlineUrgency(days);
@@ -34,7 +36,7 @@ export function DeadlineBadge({ deadline, submitted = false, className }: { dead
     <Icon className="h-4 w-4 shrink-0" />
     <span><span className="font-medium">Fix by:</span> <time dateTime={deadline ?? undefined}>{formatDeadline(deadline)}</time></span>
     {submitted
-      ? <span className="font-medium">· Evidence submitted</span>
+      ? <span className="font-medium">· {settled}</span>
       : today && deadline && <span className="font-semibold">· {describeCountdown(days)}</span>}
   </p>;
 }
