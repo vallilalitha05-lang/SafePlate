@@ -77,6 +77,7 @@ export default async function OwnerTicketPage({ params }: { params: Promise<{ ti
         <ul className="space-y-4">{sortByDeadline(ticket.flagged_items).map((item, index) => {
           const pendingReview = item.status === "pending_inspector_review";
           const resolved = item.status === "resolved";
+          const reInspection = item.status === "re_inspection_required";
           const inspectionPhoto = item.photo_path ? photoUrls[`inspection-photos/${item.photo_path}`] : undefined;
           const evidencePhoto = item.evidence_photo_path ? photoUrls[`remediation-evidence/${item.evidence_photo_path}`] : undefined;
           return <li key={item.item} className="rounded-lg border bg-background p-4">
@@ -84,14 +85,14 @@ export default async function OwnerTicketPage({ params }: { params: Promise<{ ti
             {item.comment && <p className="mt-1 text-sm text-muted-foreground">{item.comment}</p>}
             <DeadlineBadge className="mt-2" deadline={item.remediation_deadline} settled={settledLabel(item)} />
             {inspectionPhoto && <a className="mt-2 inline-flex items-center gap-2 text-sm font-medium text-primary underline-offset-4 hover:underline" href={inspectionPhoto} target="_blank" rel="noreferrer"><ImageIcon className="h-4 w-4" />View inspection photo</a>}
-            {isOpen && !pendingReview && !resolved && <OverdueNotice deadline={item.remediation_deadline} />}
+            {isOpen && !pendingReview && !resolved && !reInspection && <OverdueNotice deadline={item.remediation_deadline} />}
             <ReviewOutcome item={item} />
             {item.evidence_photo_path && <div className="mt-3 rounded-md bg-muted/60 p-3 text-sm">
-              <p><span className="font-medium">{wasSentBack(item) ? "Previous evidence" : "Evidence submitted"}</span>{item.evidence_submitted_at ? ` ${new Date(item.evidence_submitted_at).toLocaleString()}` : ""}</p>
+              <p><span className="font-medium">{wasSentBack(item) || reInspection ? "Previous evidence" : "Evidence submitted"}</span>{item.evidence_submitted_at ? ` ${new Date(item.evidence_submitted_at).toLocaleString()}` : ""}</p>
               {item.evidence_note && <p className="mt-1 text-muted-foreground">{item.evidence_note}</p>}
               {evidencePhoto && <a className="mt-2 inline-flex items-center gap-2 font-medium text-primary underline-offset-4 hover:underline" href={evidencePhoto} target="_blank" rel="noreferrer"><ImageIcon className="h-4 w-4" />View submitted evidence</a>}
             </div>}
-            {isOpen && !resolved && <EvidenceUploadForm ticketId={ticket.id} item={item.item} index={index} hasEvidence={pendingReview} />}
+            {isOpen && !resolved && !reInspection && <EvidenceUploadForm ticketId={ticket.id} item={item.item} index={index} hasEvidence={pendingReview} />}
           </li>;
         })}</ul>
       </CardContent>
