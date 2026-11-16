@@ -23,6 +23,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Fix rejection and follow-up inspections | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/follow-up-inspections.tsx`, `src/components/dashboard/verify-in-person-button.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261118000000_reject_and_reinspect.sql` |
 | Daily deadline check and overdue flags | `supabase/migrations/20261119000000_daily_deadline_check.sql`, `src/components/dashboard/overdue-issues.tsx`, `src/components/dashboard/inspector-notifications.tsx`, `src/app/inspector/page.tsx` |
 | Store suspension | `supabase/migrations/20261120000000_store_suspensions.sql`, `src/components/dashboard/suspend-store-form.tsx`, `src/components/dashboard/store-operating-status.tsx`, `src/components/dashboard/suspension-banner.tsx`, `src/components/dashboard/overdue-issues.tsx` |
+| Deadline warnings | `supabase/migrations/20261121000000_deadline_warnings.sql`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts` |
 
 ## Account and access
 
@@ -242,9 +243,9 @@ late evidence (AC12.2).
 
 | Acceptance criterion | Production behavior | Test case | Expected result |
 | --- | --- | --- | --- |
-| AC17.1 Deadline passes with no evidence | The daily check sets the item to `overdue` and notifies the assigned inspector. | **MAN-17.1:** In the Supabase SQL editor, set one flagged item's `remediation_deadline` on an open ticket to yesterday (no evidence submitted), then run `select private.run_deadline_check();`. Sign in as the inspector who raised the ticket, then as the owner. | The function returns 1. The inspector sees **Issue overdue** under **Notifications** and the item under **Overdue issues**; the owner sees an **Overdue** badge. |
+| AC17.1 Deadline passes with no evidence | The daily check sets the item to `overdue` and notifies the assigned inspector. | **MAN-17.1:** In the Supabase SQL editor, set one flagged item's `remediation_deadline` on an open ticket to yesterday (no evidence submitted), then run `select private.run_deadline_check();`. Sign in as the inspector who raised the ticket, then as the owner. | The function returns `{"overdue": 1, …}`. The inspector sees **Issue overdue** under **Notifications** and the item under **Overdue issues**; the owner sees an **Overdue** badge. |
 | AC17.2 Evidence submitted before the deadline | Items in `pending_inspector_review` are skipped. | **MAN-17.2:** Submit evidence for an item (MAN-12.1), then set its deadline to yesterday and run `select private.run_deadline_check();`. | The item is not flagged overdue, stays **Pending inspector review** and still appears in **Evidence to review**; no overdue notification is created. |
-| Runs daily and only once per item | The cron job exists; re-running does not duplicate flags or notifications. | **MAN-17.3:** Run `select jobname, schedule from cron.job;` then run the check twice. | `safeplate-daily-deadline-check` with `5 6 * * *`. The second run returns 0. |
+| Runs daily and only once per item | The cron job exists; re-running does not duplicate flags or notifications. | **MAN-17.3:** Run `select jobname, schedule from cron.job;` then run the check twice. | `safeplate-daily-deadline-check` with `5 6 * * *`. The second run returns `{"overdue": 0, "warnings": 0}`. |
 | Notifications are private | RLS limits `inspector_notifications` to the inspector it was sent to. | **MAN-17.4:** Sign in as a different inspector and as a store owner. | Neither sees the overdue notification. |
 
 ### Story 18: Suspend a store's operating status
@@ -268,6 +269,27 @@ No formal acceptance criteria were supplied with this story; these were derived 
 | AC18.4 Only inspectors can change operating status | `suspend_store` / `lift_store_suspension` refuse non-inspectors (`42501`); owners have no update privilege on `operating_status`. | **MAN-18.4:** As the store owner, from the browser console call `suspend_store` / `lift_store_suspension`, or update `stores.operating_status`. | All are refused; the status does not change. |
 | AC18.5 Suspension can be lifted and the lift is recorded | `lift_store_suspension` sets `lifted_at`, `lifted_by` and `lift_reason`, reactivates the store and notifies the owner. | **MAN-18.5:** Under **Currently suspended**, enter a reason and select **Lift suspension**. Sign in as the owner. | The store is active again; the record keeps both the suspension and the lift; the owner gets **Suspension lifted**. |
 | AC18.6 No double suspension | Only one active suspension per store. | **MAN-18.6:** Call `suspend_store` again for a suspended store. | “This store is already suspended.” |
+
+### Story 19: Warn store owners as a deadline approaches
+
+**Production code:** the daily `private.run_deadline_check()` (story 17) now also
+sends the store owner a `deadline_warning` notification for each item still
+waiting on them (no status yet, or sent back for new evidence) whose deadline is
+today or within the next 3 days. The item records `deadline_warning_sent_for`,
+so each deadline is warned about once; an extended deadline gets a new warning.
+The check returns `{"overdue": n, "warnings": n}`. Owners see **Deadline
+approaching** with the item, store, deadline countdown, the suspension
+consequence and an **Upload evidence** link.
+
+No formal acceptance criteria were supplied with this story; these were derived from it.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC19.1 Warning before the deadline | An item needing action with a deadline today or within 3 days triggers one owner notification. | **MAN-19.1:** In the SQL editor set an item's deadline (no evidence) to 2 days from today and run `select private.run_deadline_check();`. Sign in as the owner. | `{"overdue": 0, "warnings": 1}`. **Deadline approaching** names the item and store, shows “Due in 2 days”, warns that missed deadlines can lead to suspension and links to **Upload evidence**. |
+| AC19.2 No warning once evidence is in or the issue is resolved | Items pending review, awaiting a follow-up visit, resolved or overdue are skipped. | **MAN-19.2:** Submit evidence for an item due tomorrow, then run the check. | No warning for that item. |
+| AC19.3 Warned once per deadline | Re-running does not duplicate; an extended deadline is warned about again when it comes within 3 days. | **MAN-19.3:** Run the check twice. Then, as the inspector, **Request new evidence…** with a new deadline 2 days out and run the check. | The second run returns `{"warnings": 0}`. The extended deadline produces one new warning. |
+| AC19.4 Only the store owner is warned | Warnings are `owner_notifications` for the ticket's owner (RLS). | **MAN-19.4:** Sign in as another store owner and as an inspector. | Neither sees the warning. |
+| AC19.5 Items further out are not warned yet | Deadlines more than 3 days away are skipped until they come within range. | **MAN-19.5:** Set a deadline 5 days out and run the check. | No warning until the check runs 3 days before the deadline. |
 
 ## Baseline release checks
 
