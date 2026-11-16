@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BellRing, CalendarClock, CheckCircle2, LoaderCircle, TicketCheck } from "lucide-react";
+import { Ban, BellRing, CalendarClock, CheckCircle2, LoaderCircle, ShieldCheck, TicketCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocalDateTime } from "@/components/ui/local-date-time";
@@ -41,16 +41,18 @@ export function OwnerNotifications({ notifications }: { notifications: Notificat
         const { title, message, reason, scheduledFor } = describeNotification(notification);
         const approved = notification.kind === "item_approved";
         const rejected = notification.kind === "item_rejected";
-        const Icon = approved ? CheckCircle2 : rejected ? CalendarClock : TicketCheck;
+        const suspended = notification.kind === "store_suspended";
+        const lifted = notification.kind === "suspension_lifted";
+        const Icon = approved ? CheckCircle2 : rejected ? CalendarClock : suspended ? Ban : lifted ? ShieldCheck : TicketCheck;
         return <li key={notification.id} className="flex flex-col gap-3 rounded-md border bg-background p-3 sm:flex-row sm:items-start sm:justify-between" data-kind={notification.kind}>
           <div className="flex min-w-0 items-start gap-2">
-            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${approved ? "text-emerald-600" : rejected ? "text-amber-600" : "text-primary"}`} />
+            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${approved || lifted ? "text-emerald-600" : rejected ? "text-amber-600" : suspended ? "text-destructive" : "text-primary"}`} />
             <div className="min-w-0 text-sm">
               <p className="font-medium">{title}</p>
               <p className="text-muted-foreground">{message}</p>
               {reason && <p className="mt-1"><span className="font-medium">Reason:</span> “{reason}”</p>}
               {scheduledFor && <p className="mt-1"><span className="font-medium">Follow-up inspection:</span> <LocalDateTime value={scheduledFor} /></p>}
-              <p className="mt-1 text-xs text-muted-foreground"><LocalDateTime value={notification.created_at} /> · <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/owner/tickets/${notification.ticket_id}`}>View ticket</Link></p>
+              <p className="mt-1 text-xs text-muted-foreground"><LocalDateTime value={notification.created_at} />{notification.ticket_id && <> · <Link className="font-medium text-primary underline-offset-4 hover:underline" href={`/owner/tickets/${notification.ticket_id}`}>View ticket</Link></>}</p>
             </div>
           </div>
           <Button type="button" size="sm" variant="outline" className="shrink-0 self-start" onClick={() => markRead([notification.id], notification.id)} disabled={busy !== undefined}>{busy === notification.id && <LoaderCircle className="h-4 w-4 animate-spin" />}Mark as read</Button>

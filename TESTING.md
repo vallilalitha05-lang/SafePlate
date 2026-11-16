@@ -22,6 +22,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Fix approval and owner notifications | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts`, `src/app/owner/page.tsx`, `supabase/migrations/20261117000000_approval_notifications.sql` |
 | Fix rejection and follow-up inspections | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/follow-up-inspections.tsx`, `src/components/dashboard/verify-in-person-button.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261118000000_reject_and_reinspect.sql` |
 | Daily deadline check and overdue flags | `supabase/migrations/20261119000000_daily_deadline_check.sql`, `src/components/dashboard/overdue-issues.tsx`, `src/components/dashboard/inspector-notifications.tsx`, `src/app/inspector/page.tsx` |
+| Store suspension | `supabase/migrations/20261120000000_store_suspensions.sql`, `src/components/dashboard/suspend-store-form.tsx`, `src/components/dashboard/store-operating-status.tsx`, `src/components/dashboard/suspension-banner.tsx`, `src/components/dashboard/overdue-issues.tsx` |
 
 ## Account and access
 
@@ -245,6 +246,28 @@ late evidence (AC12.2).
 | AC17.2 Evidence submitted before the deadline | Items in `pending_inspector_review` are skipped. | **MAN-17.2:** Submit evidence for an item (MAN-12.1), then set its deadline to yesterday and run `select private.run_deadline_check();`. | The item is not flagged overdue, stays **Pending inspector review** and still appears in **Evidence to review**; no overdue notification is created. |
 | Runs daily and only once per item | The cron job exists; re-running does not duplicate flags or notifications. | **MAN-17.3:** Run `select jobname, schedule from cron.job;` then run the check twice. | `safeplate-daily-deadline-check` with `5 6 * * *`. The second run returns 0. |
 | Notifications are private | RLS limits `inspector_notifications` to the inspector it was sent to. | **MAN-17.4:** Sign in as a different inspector and as a store owner. | Neither sees the overdue notification. |
+
+### Story 18: Suspend a store's operating status
+
+**Production code:** `stores.operating_status` is `active` or `suspended`.
+`suspend_store` (inspectors only) requires a reason, records a
+`store_suspensions` row (who, when, why, optional overdue ticket and item), sets
+the store to `suspended` and sends the owner a `store_suspended` notification.
+`lift_store_suspension` (inspectors only, reason required) closes the record,
+reactivates the store and notifies the owner. Owners can only edit a store's
+name and address, so they cannot change its status; suspension records cannot
+be edited or deleted by users.
+
+No formal acceptance criteria were supplied with this story; these were derived from it.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC18.1 Suspension is officially recorded | A `store_suspensions` row stores the store, owner, inspector, time, reason and any related overdue issue; the store becomes `suspended`. | **MAN-18.1:** As an inspector, under **Overdue issues** open **Initiate suspension of …** (reason pre-filled) and select **Suspend store**. In the SQL editor run `select * from store_suspensions;`. | Confirmation shown. One active record with your user, the reason, the ticket and item; `stores.operating_status` is `suspended`. |
+| AC18.2 Visible to relevant parties | Owner: red banner, **Suspended** badge on the store and a **Store suspended** notification with the reason. Inspectors: **Store operating status** lists it for every inspector and the checklist store picker shows **Suspended**. | **MAN-18.2:** Sign in as the store owner, then as a different inspector. Then sign in as another store owner. | Owner sees the banner, badge and notification. The other inspector sees the store as suspended. The other owner sees nothing about it. |
+| AC18.3 A reason is required | The form blocks a blank reason and focuses the field; `suspend_store` also refuses it. | **MAN-18.3:** In **Suspend a store**, choose a store, leave the reason empty and select **Suspend store**. | “Provide a reason for suspending this store…” and the store stays active. |
+| AC18.4 Only inspectors can change operating status | `suspend_store` / `lift_store_suspension` refuse non-inspectors (`42501`); owners have no update privilege on `operating_status`. | **MAN-18.4:** As the store owner, from the browser console call `suspend_store` / `lift_store_suspension`, or update `stores.operating_status`. | All are refused; the status does not change. |
+| AC18.5 Suspension can be lifted and the lift is recorded | `lift_store_suspension` sets `lifted_at`, `lifted_by` and `lift_reason`, reactivates the store and notifies the owner. | **MAN-18.5:** Under **Currently suspended**, enter a reason and select **Lift suspension**. Sign in as the owner. | The store is active again; the record keeps both the suspension and the lift; the owner gets **Suspension lifted**. |
+| AC18.6 No double suspension | Only one active suspension per store. | **MAN-18.6:** Call `suspend_store` again for a suspended store. | “This store is already suspended.” |
 
 ## Baseline release checks
 

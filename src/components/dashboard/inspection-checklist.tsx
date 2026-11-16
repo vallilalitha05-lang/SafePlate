@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
-type Store = { id: string; name: string; address: string | null };
+type Store = { id: string; name: string; address: string | null; operating_status?: string };
 
 const checklistItems = [
   "Food is stored at safe temperatures",
@@ -146,7 +146,7 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
       <CardHeader><CardTitle className="text-base">1. Select a store</CardTitle><CardDescription>Choose the food business you are visiting.</CardDescription></CardHeader>
       <CardContent className="space-y-3">
         {stores.map((store) => <Button key={store.id} type="button" variant="outline" onClick={() => { setSelectedStoreId(store.id); setStatus(undefined); }} className={`h-auto w-full justify-start rounded-lg p-4 text-left ${selectedStoreId === store.id ? "border-primary bg-accent" : "bg-background hover:bg-muted"}`}>
-          <span className="block font-medium">{store.name}</span>
+          <span className="flex items-center gap-2 font-medium">{store.name}{store.operating_status === "suspended" && <span className="rounded-full bg-destructive px-2 py-0.5 text-xs font-semibold text-white">Suspended</span>}</span>
           {store.address && <span className="mt-1 flex items-center gap-1 text-sm text-muted-foreground"><MapPin className="h-3.5 w-3.5" />{store.address}</span>}
         </Button>)}
       </CardContent>
