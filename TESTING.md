@@ -20,6 +20,7 @@ store, and a second owner to check data isolation. Use unique test emails.
 | Remediation deadlines and priorities | `src/lib/deadlines.ts`, `src/components/dashboard/deadline-badge.tsx`, `src/components/dashboard/workspace.tsx`, `src/app/owner/tickets/[ticketId]/page.tsx` |
 | Evidence review | `src/app/inspector/page.tsx`, `src/components/dashboard/evidence-review-queue.tsx`, `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261116000000_review_ticket_evidence.sql` |
 | Fix approval and owner notifications | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/owner-notifications.tsx`, `src/lib/notifications.ts`, `src/app/owner/page.tsx`, `supabase/migrations/20261117000000_approval_notifications.sql` |
+| Fix rejection and follow-up inspections | `src/components/dashboard/review-decision-form.tsx`, `src/components/dashboard/follow-up-inspections.tsx`, `src/components/dashboard/verify-in-person-button.tsx`, `src/components/dashboard/item-status.tsx`, `supabase/migrations/20261118000000_reject_and_reinspect.sql` |
 
 ## Account and access
 
@@ -175,7 +176,7 @@ flagged item on the inspector's own open tickets with status
 `pending_inspector_review`, oldest submission first, with the inspection photo
 beside the owner's evidence. `review_ticket_evidence` only lets the inspector who
 raised the ticket decide. **Approve fix** sets the item to `resolved`; the ticket
-becomes `resolved` once every item is. **Not resolved** requires feedback, can set
+becomes `resolved` once every item is. **Request new evidence** requires feedback, can set
 a new deadline (today or later) and returns the item to the owner (`open`,
 `review_decision: "not_resolved"`). Owners cannot resubmit a resolved item.
 
@@ -202,6 +203,27 @@ The owner workspace lists unread notifications with **Mark as read** /
 | AC15.1 Approval of valid evidence | The item's status changes to `resolved` and the store owner receives an `item_approved` notification naming the item and store. | **MAN-15.1:** As Owner A, submit evidence (MAN-12.1). As the issuing inspector, open **Evidence to review** and select **Approve fix**. Sign in as Owner A. | The inspector sees “Approved. The issue is resolved and the store owner has been notified.” Owner A's **Notifications** shows **Fix approved** for that item and store, and the item shows **Resolved**. |
 | Not resolved does not notify approval | Only an approval creates an `item_approved` notification. | **MAN-15.2:** As the inspector, mark another item **Not resolved** with feedback. Sign in as Owner A. | No **Fix approved** notification for that item; the feedback shows on the item instead. |
 | Notifications are private and can be cleared | RLS limits notifications to their owner; only the owner can mark them read. | **MAN-15.3:** As Owner A select **Mark as read**, then reload. Sign in as Owner B. | The notification no longer shows for Owner A. Owner B never sees Owner A's notifications. |
+
+### Story 16: Reject a submitted fix and schedule a follow-up physical inspection
+
+**Production code:** **Reject fix…** asks for a reason and a follow-up date and
+time, then calls `review_ticket_evidence` with `re_inspection`. In one
+transaction the item's status becomes `re_inspection_required`, a
+`follow_up_inspections` row is scheduled and an `item_rejected` notification
+(linked to the follow-up, which holds the reason and visit time) is sent to the
+store owner. The form and the function both refuse a rejection without a reason.
+After the visit the inspector uses **Verified in person – approve fix** under
+**Scheduled follow-up inspections**, which resolves the item, completes the
+follow-up and notifies the owner (story 15). **Request new evidence…** (story 14)
+remains for asking for a better photo without a visit.
+
+| Acceptance criterion | Production behavior | Test case | Expected result |
+| --- | --- | --- | --- |
+| AC16.1 Rejection and re-inspection | Status → `re_inspection_required`; follow-up scheduled; owner notified with the reason. | **MAN-16.1:** As Owner A, submit evidence (MAN-12.1). As the issuing inspector, open **Evidence to review**, enter a reason, select **Reject fix…**, choose a future date and time and select **Reject and schedule re-inspection**. Sign in as Owner A. | The inspector sees the confirmation and the visit under **Scheduled follow-up inspections**. Owner A's **Notifications** shows **Fix rejected – follow-up inspection scheduled** with the reason and visit time; the item shows **Re-inspection required** and no upload form. |
+| AC16.2 Rejection without a reason | The form blocks the action, highlights and focuses the reason field and shows a prompt; the function also refuses (`22023`). | **MAN-16.2:** Leave the reason empty (or only spaces), select **Reject fix…**, choose a date and select **Reject and schedule re-inspection**. | “Provide a reason for rejecting this fix.” is shown, the reason field is marked **A reason is required.**, and the item stays **Pending inspector review**. |
+| Follow-up time must be in the future | The form and function refuse a missing or past time. | **MAN-16.3:** Enter a reason but no date (or a past time) and confirm. | “Choose a future date and time for the follow-up inspection.” Nothing changes. |
+| Verify in person | Approving from **Scheduled follow-up inspections** resolves the item and completes the follow-up. | **MAN-16.4:** After MAN-16.1, select **Verified in person – approve fix**. Sign in as Owner A. | The follow-up leaves the list; Owner A sees **Fix approved** and the item shows it was verified in person. |
+| Owner cannot bypass the visit | `submit_ticket_evidence` refuses evidence while the item is `re_inspection_required`. | **MAN-16.5:** As Owner A, call `submit_ticket_evidence` for that item from the console. | Rejected: a follow-up inspection is scheduled for this item. |
 
 ## Baseline release checks
 
