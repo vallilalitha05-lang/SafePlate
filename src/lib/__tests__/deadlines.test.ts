@@ -19,6 +19,11 @@ describe("getDaysRemaining", () => {
   it("returns the days left until the deadline", () => {
     expect(getDaysRemaining("2026-11-18", today)).toBe(3);
   });
+
+  // Other test 1 — boundary: the deadline is today
+  it("returns 0 on the deadline day", () => {
+    expect(getDaysRemaining(today, today)).toBe(0);
+  });
 });
 
 describe("isOverdue", () => {

@@ -357,6 +357,14 @@ code. `shouldFlagOverdue` and `allItemsResolved` mirror the database rules in
 | 17 Flag overdue issues | 17.2 | `deadlines.test.ts › shouldFlagOverdue` | `does not flag an item with evidence already submitted` | Deadline passed, evidence submitted before the deadline. Expected: false. |
 | 17 Flag overdue issues | 17.3 | `deadlines.test.ts › shouldFlagOverdue` | `does not flag a resolved item` | Status "resolved", deadline passed. Expected: false. |
 
+### Other automated tests (boundary cases)
+
+| # | Test file › function | Test (`it`) | Input → expected output |
+| --- | --- | --- | --- |
+| 1 | `deadlines.test.ts › getDaysRemaining` | `returns 0 on the deadline day` | Deadline equal to today → 0. |
+| 2 | `validation.test.ts › validateEmail` | `rejects an empty email` | `""` → { valid: false }, no exception. |
+| 3 | `validation.test.ts › validatePhoto` | `accepts a file exactly at the size limit` | JPEG of exactly 5 MB → { valid: true }. |
+
 ## Baseline release checks
 
 ```bash

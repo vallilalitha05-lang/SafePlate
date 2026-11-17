@@ -47,6 +47,12 @@ describe("validateEmail", () => {
   it("rejects a SQL-injection string", () => {
     expect(validateEmail("' OR 1=1--").valid).toBe(false);
   });
+
+  // Other test 2 — empty input is rejected without throwing
+  it("rejects an empty email", () => {
+    expect(() => validateEmail("")).not.toThrow();
+    expect(validateEmail("").valid).toBe(false);
+  });
 });
 
 describe("findUnmarkedItems", () => {
@@ -74,6 +80,11 @@ describe("validatePhoto", () => {
   });
 
   // AC7.3 — Story 7: Attach a photo
+  // Other test 3 — boundary: exactly 5 MB is allowed
+  it("accepts a file exactly at the size limit", () => {
+    expect(validatePhoto(fileOf("image/jpeg", 5 * 1024 * 1024))).toEqual({ valid: true });
+  });
+
   it("rejects a file larger than 5 MB", () => {
     const result = validatePhoto(fileOf("image/jpeg", 5 * 1024 * 1024 + 1));
     expect(result.valid).toBe(false);
