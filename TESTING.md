@@ -325,6 +325,20 @@ which shows the same trends, inspections and suspension record as story 20.
 | Unknown or invalid store ID | Same authorization error for owners (no probing). | **MAN-21.3:** As Owner A open `/owner/stores/00000000-0000-0000-0000-000000000000`. | **Not authorized**, identical to MAN-21.2. |
 | Inspector access unchanged | Inspectors still get any store (story 20). | **MAN-21.4:** Repeat MAN-20.1. | Unchanged. |
 
+### Fix: deadlines use the US Central date
+
+All deadline checks in the database use `private.business_today()` — the
+current date in `America/Chicago`, the same date the app shows — instead of the
+database's UTC `current_date`, which is already the next day from 6 PM (7 PM in
+summer) Central time.
+
+| Check | Test case | Expected result |
+| --- | --- | --- |
+| Inspection with a deadline of today, in the evening | **MAN-TZ.1:** After 6 PM Central, submit a failed checklist item with today's date as the remediation deadline. | The inspection saves and a ticket is created. A deadline of yesterday is still refused. |
+| Evidence submitted on the deadline day, in the evening | **MAN-TZ.2:** After 6 PM Central, submit evidence for an item due today. | The item is **not** marked **Resolved late**. |
+| New deadline of today | **MAN-TZ.3:** After 6 PM Central, **Request new evidence…** with today as the new deadline. | Accepted. |
+| Daily check | **MAN-TZ.4:** `select private.business_today(), current_date;` after 6 PM Central. | `business_today` is the Central date; `run_deadline_check()` uses it by default. |
+
 ## Baseline release checks
 
 ```bash
