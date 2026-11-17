@@ -14,3 +14,7 @@ The schema uses RLS to limit profile reads to the authenticated person. It delib
 ## Deployment
 
 Add the same two `NEXT_PUBLIC_SUPABASE_*` variables to Vercel, then deploy the repository. No service-role key is used by this app.
+
+## Tests
+
+Run the automated acceptance tests with `pnpm test`. See [TESTING.md](TESTING.md) for the AC-to-test mapping and manual test cases.

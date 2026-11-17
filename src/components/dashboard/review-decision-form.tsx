@@ -9,11 +9,12 @@ import { Label } from "@/components/ui/label";
 import { localToday } from "@/lib/deadlines";
 import { reviewAuthorizationError, type ReviewDecision } from "@/lib/evidence";
 import { createClient } from "@/lib/supabase/client";
+import { reviewMessages, validateFollowUpDate, validateRejectionReason } from "@/lib/review";
 
 type Status = { kind: "success" | "error" | "unauthorized"; message: string };
 type Panel = "reject" | "request" | undefined;
 
-const rejectionReasonPrompt = "Provide a reason for rejecting this fix. The store owner will see it.";
+const rejectionReasonPrompt = reviewMessages.rejectionReason;
 
 /** Current local time as a value for <input type="datetime-local"> (YYYY-MM-DDTHH:mm). */
 function localDateTimeValue(date = new Date()) {
@@ -41,17 +42,18 @@ export function ReviewDecisionForm({ ticketId, item, index }: { ticketId: string
   async function decide(decision: ReviewDecision) {
     const trimmed = reason.trim();
     // AC16.2: a rejection without a reason is refused and the inspector is prompted.
-    if (decision === "re_inspection" && !trimmed) return promptForReason(rejectionReasonPrompt);
+    const reasonCheck = validateRejectionReason(trimmed);
+    if (decision === "re_inspection" && !reasonCheck.valid) return promptForReason(reasonCheck.message);
     if (decision === "not_resolved" && !trimmed) return promptForReason("Explain what the store owner still needs to show before requesting new evidence.");
 
     let followUpIso: string | null = null;
     if (decision === "re_inspection") {
-      const when = followUpAt ? new Date(followUpAt) : undefined;
-      if (!when || Number.isNaN(when.getTime()) || when <= new Date()) {
-        setStatus({ kind: "error", message: "Choose a future date and time for the follow-up inspection." });
+      const followUpCheck = validateFollowUpDate(followUpAt || undefined);
+      if (!followUpCheck.valid) {
+        setStatus({ kind: "error", message: followUpCheck.message });
         return;
       }
-      followUpIso = when.toISOString();
+      followUpIso = new Date(followUpAt).toISOString();
     }
     if (decision === "not_resolved" && newDeadline && newDeadline < localToday()) {
       setStatus({ kind: "error", message: "A new deadline must be today or later." });

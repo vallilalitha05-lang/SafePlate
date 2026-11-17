@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { validateEmail, validatePassword, validatePasswordMatch } from "@/lib/validation";
 
 type Role = "inspector" | "store_owner";
 
@@ -29,6 +30,14 @@ export function RegisterForm() {
     const fullName = String(formData.get("fullName") ?? "").trim();
     const email = String(formData.get("email") ?? "").trim();
     const password = String(formData.get("password") ?? "");
+    const confirmation = String(formData.get("confirmPassword") ?? "");
+    // AC1.4–AC1.8: reject invalid input before any request reaches Supabase.
+    const check = [validateEmail(email), validatePassword(password), validatePasswordMatch(password, confirmation)].find((result) => !result.valid);
+    if (check && !check.valid) {
+      setIsPending(false);
+      setStatus(check.message);
+      return;
+    }
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -60,6 +69,7 @@ export function RegisterForm() {
       <div className="space-y-2"><Label htmlFor="fullName">Full name</Label><Input id="fullName" name="fullName" autoComplete="name" required minLength={2} placeholder="Jordan Lee" /></div>
       <div className="space-y-2"><Label htmlFor="email">Email address</Label><Input id="email" name="email" type="email" autoComplete="email" required placeholder="you@example.com" /></div>
       <div className="space-y-2"><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" autoComplete="new-password" required minLength={8} placeholder="At least 8 characters" /><p className="text-xs text-muted-foreground">Use at least 8 characters.</p></div>
+      <div className="space-y-2"><Label htmlFor="confirmPassword">Confirm password</Label><Input id="confirmPassword" name="confirmPassword" type="password" autoComplete="new-password" required placeholder="Re-enter your password" /></div>
       {status && <p role="status" className="rounded-md border border-destructive/20 bg-destructive/10 px-3 py-2 text-sm text-destructive">{status}</p>}
       <Button type="submit" className="w-full" disabled={isPending}>{isPending && <LoaderCircle className="h-4 w-4 animate-spin" />}Create account</Button>
       <p className="text-center text-xs text-muted-foreground">Your role determines the workspace and records you can access.</p>
