@@ -73,3 +73,35 @@ export function compareByDeadline(a: FlaggedItem, b: FlaggedItem) {
 export function sortByDeadline(items: FlaggedItem[]) {
   return [...items].sort(compareByDeadline);
 }
+
+// AC13.1 — View remediation deadlines: whole days left until the deadline.
+export function getDaysRemaining(deadline: string | null, today = localToday()) {
+  return daysUntil(deadline, today);
+}
+
+/** Statuses for which the store owner still has to act on an item. */
+function awaitingOwner(item: Pick<FlaggedItem, "status">) {
+  return !item.status || item.status === "open" || item.status === "overdue";
+}
+
+// AC13.2 — View remediation deadlines: past the deadline with no evidence submitted.
+export function isOverdue(item: Pick<FlaggedItem, "status" | "remediation_deadline">, today = localToday()) {
+  return awaitingOwner(item) && !!item.remediation_deadline && item.remediation_deadline < today;
+}
+
+// AC17.1–AC17.3 — Flag overdue issues: the daily check flags an item that is
+// still waiting on the owner (not yet flagged) once its deadline has passed.
+// Mirrors private.run_deadline_check in the database.
+export function shouldFlagOverdue(item: Pick<FlaggedItem, "status" | "remediation_deadline">, today = localToday()) {
+  return (!item.status || item.status === "open") && !!item.remediation_deadline && item.remediation_deadline < today;
+}
+
+// AC12.2 — Upload remediation evidence: evidence is always accepted for review;
+// it is marked resolved late when submitted after the deadline.
+export function evidenceStatusForSubmission(deadline: string | null, submittedOn = localToday()) {
+  return {
+    accepted: true as const,
+    status: "pending_inspector_review" as const,
+    resolvedLate: !!deadline && submittedOn > deadline,
+  };
+}

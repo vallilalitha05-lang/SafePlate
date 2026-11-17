@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
+import { localToday } from "@/lib/deadlines";
+import { findUnmarkedItems, validateInspectionSubmit, validatePhoto } from "@/lib/validation";
 
 type Store = { id: string; name: string; address: string | null; operating_status?: string };
 
@@ -19,13 +21,6 @@ const checklistItems = [
 
 type Result = "pass" | "fail";
 type ChecklistResponse = { result?: Result; comment: string; deadline?: string; photo?: File };
-const acceptedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-const maximumPhotoSize = 5 * 1024 * 1024;
-
-function localDate() {
-  const date = new Date();
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
 
 export function InspectionChecklist({ stores }: { stores: Store[] }) {
   const [selectedStoreId, setSelectedStoreId] = useState<string>();
@@ -34,10 +29,7 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
   const [status, setStatus] = useState<string>();
   const [isPending, setIsPending] = useState(false);
   const selectedStore = stores.find((store) => store.id === selectedStoreId);
-  const unmarkedItems = checklistItems.filter((item) => !responses[item]?.result);
-  const failedItemsMissingComments = checklistItems.filter((item) => responses[item]?.result === "fail" && !responses[item]?.comment.trim());
-  const failedItemsMissingDeadlines = checklistItems.filter((item) => responses[item]?.result === "fail" && !responses[item]?.deadline);
-  const failedItemsWithPastDeadlines = checklistItems.filter((item) => responses[item]?.result === "fail" && responses[item]?.deadline && responses[item].deadline < localDate());
+  const unmarkedItems = findUnmarkedItems(checklistItems, responses);
   const complete = unmarkedItems.length === 0;
   const overallStatus: Result | undefined = !complete ? undefined : checklistItems.some((item) => responses[item]?.result === "fail") ? "fail" : "pass";
 
@@ -59,12 +51,9 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
   }
 
   function setPhoto(item: string, file: File | undefined) {
-    if (file && !acceptedImageTypes.includes(file.type)) {
-      setStatus("Attach a JPEG, PNG, or WebP image for a failed item.");
-      return;
-    }
-    if (file && file.size > maximumPhotoSize) {
-      setStatus("Each inspection photo must be 5 MB or smaller.");
+    const photoCheck = file ? validatePhoto(file) : undefined;
+    if (photoCheck && !photoCheck.valid) {
+      setStatus(photoCheck.message);
       return;
     }
     setResponses((current) => ({ ...current, [item]: { ...current[item], comment: current[item]?.comment ?? "", photo: file } }));
@@ -72,24 +61,9 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
   }
 
   async function submitInspection() {
-    if (!selectedStoreId) {
-      setStatus("Select a store before starting the checklist.");
-      return;
-    }
-    if (!complete || !overallStatus) {
-      setStatus(`Mark every checklist item before submitting: ${unmarkedItems.join("; ")}.`);
-      return;
-    }
-    if (failedItemsMissingComments.length > 0) {
-      setStatus(`Add a written comment for every failed item before submitting: ${failedItemsMissingComments.join("; ")}.`);
-      return;
-    }
-    if (failedItemsMissingDeadlines.length > 0) {
-      setStatus(`Set a remediation deadline for every failed item before submitting: ${failedItemsMissingDeadlines.join("; ")}.`);
-      return;
-    }
-    if (failedItemsWithPastDeadlines.length > 0) {
-      setStatus(`Choose a remediation deadline that is today or later: ${failedItemsWithPastDeadlines.join("; ")}.`);
+    const check = validateInspectionSubmit({ storeId: selectedStoreId, items: checklistItems, responses, today: localToday() });
+    if (!check.valid || !overallStatus) {
+      setStatus(check.valid ? "Mark every checklist item before submitting." : check.message);
       return;
     }
 
@@ -164,7 +138,7 @@ export function InspectionChecklist({ stores }: { stores: Store[] }) {
           {responses[item]?.result === "fail" && <div className="space-y-3 border-t border-destructive/20 pt-3 pl-9">
             <p className="text-sm text-destructive">A written comment is required for every failed item. Add a photo if useful.</p>
             <div className="space-y-2"><Label htmlFor={`comment-${index}`}>Comment <span className="text-destructive">(required)</span></Label><Input id={`comment-${index}`} value={responses[item]?.comment ?? ""} onChange={(event) => setComment(item, event.target.value)} maxLength={500} required aria-required="true" placeholder="Describe what needs attention" /></div>
-            <div className="space-y-2"><Label htmlFor={`deadline-${index}`} className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />Remediation deadline <span className="text-destructive">(required)</span></Label><Input id={`deadline-${index}`} type="date" min={localDate()} value={responses[item]?.deadline ?? ""} onChange={(event) => setDeadline(item, event.target.value)} required aria-required="true" /><p className="text-sm text-muted-foreground">The store owner must complete the fix by this date.</p></div>
+            <div className="space-y-2"><Label htmlFor={`deadline-${index}`} className="flex items-center gap-2"><CalendarClock className="h-4 w-4" />Remediation deadline <span className="text-destructive">(required)</span></Label><Input id={`deadline-${index}`} type="date" min={localToday()} value={responses[item]?.deadline ?? ""} onChange={(event) => setDeadline(item, event.target.value)} required aria-required="true" /><p className="text-sm text-muted-foreground">The store owner must complete the fix by this date.</p></div>
             <div className="space-y-2"><Label htmlFor={`photo-${index}`} className="flex items-center gap-2"><ImagePlus className="h-4 w-4" />Photo <span className="text-muted-foreground">(optional, JPEG, PNG, or WebP; max 5 MB)</span></Label><Input id={`photo-${index}`} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setPhoto(item, event.target.files?.[0])} />{responses[item]?.photo && <p className="text-sm text-muted-foreground">Attached: {responses[item].photo?.name}</p>}</div>
           </div>}
         </div>)}

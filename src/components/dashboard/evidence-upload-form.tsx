@@ -8,9 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authorizationError } from "@/lib/evidence";
 import { createClient } from "@/lib/supabase/client";
+import { validatePhoto } from "@/lib/validation";
 
-const acceptedImageTypes = ["image/jpeg", "image/png", "image/webp"];
-const maximumPhotoSize = 5 * 1024 * 1024;
 
 type Status = { kind: "success" | "error" | "unauthorized"; message: string };
 
@@ -31,14 +30,10 @@ export function EvidenceUploadForm({ ticketId, item, index, hasEvidence }: { tic
   const [isPending, setIsPending] = useState(false);
 
   function choosePhoto(file: File | undefined) {
-    if (file && !acceptedImageTypes.includes(file.type)) {
+    const photoCheck = file ? validatePhoto(file) : undefined;
+    if (photoCheck && !photoCheck.valid) {
       setPhoto(undefined);
-      setStatus({ kind: "error", message: "Upload a JPEG, PNG, or WebP image as evidence." });
-      return;
-    }
-    if (file && file.size > maximumPhotoSize) {
-      setPhoto(undefined);
-      setStatus({ kind: "error", message: "Evidence photos must be 5 MB or smaller." });
+      setStatus({ kind: "error", message: photoCheck.message });
       return;
     }
     setPhoto(file);
